@@ -8,7 +8,6 @@ Download the script and run it.  There is a basic menu.
 
 If you would prefer to run the commands directly, the help menu should give you the basics (`./gshade_installer.sh --help`):
 ```
-<pre>
 Syntax options:
 				./gshade_installer.sh						-- Guided tutorial
 				./gshade_installer.sh update					-- Install / Update to latest GShade
@@ -20,7 +19,6 @@ Syntax options:
  WINEPREFIX=/path/to/prefix	./gshade_installer.sh [dx(?)|opengl] /path/to/game.exe		-- Install to custom location with designated graphical API version. 'dxgi' is valid here if needed.
 
 									Note: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!
-<pre>
 ```
 You can also just clone the repo and run the script from within it.
 
