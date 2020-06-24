@@ -10,27 +10,39 @@ dbFile="$GShadeHome/games.db"
 
 ##
 # Yeah I think this'll make life easier.
-exeFile=""		# /path/to/and/including/<filename>.exe
-gameExe=""		# <filename>.exe
-gameLoc=""		# /path/to/but/not/including/<filename>.exe
-gamesList=""		# Human readable translation of $dbFile.
-gapi=""			# opengl, dxgi, dx[?}
-ARCH=""			# 32|64
+gameExe=""
+gameLoc=""
+gamesList=""
+gapi=""
+ARCH=""
+
+declare -a iniSettings=()
+
+##
+# Because slashes and I mean, bash v4 came out when, again?
+# Hi self, I don't mean to interrupt.  Didn't you get rid of why you needed this?
+shopt -s extglob
 
 ##
 #Syntax options:
-#				$0					-- Guided tutorial
-#				$0 update				-- Install / Update to latest GShade
+#				$0					-- Guided tutorial.
+#				$0 update				-- Install / Update to latest GShade.
 #				$0 list					-- List games, numbers provided are for use with remove / delete options.
+#				$0 lang <en|ja|ko|de|fr|it> [default|#]	-- Change the language of GShade's interface.  Defaults to the master copy if unspecified.
 #				$0 remove <#>				-- Remove <#> from database, leave GShade in whatever shape it's currently in.
 #				$0 delete <#>				-- Delete GShade from <#> and remove from database.
-#<WINEPREFIX=/path/to/prefix>	$0 ffxiv				-- Install to FFXIV in provided Wine Prefix or autodetect if no Wine Prefix
+#<WINEPREFIX=/path/to/prefix>	$0 ffxiv				-- Install to FFXIV in provided Wine Prefix or autodetect if no Wine Prefix.
 # WINEPREFIX=/path/to/prefix	$0 <dx[?]|opengl> /path/to/game.exe	-- Install to custom location with designated graphical API version. 'dxgi' is valid here if needed.
 #
 #									Note: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!
+#
+# Undocumented features:
+# 				$0 fetchCompilers			-- Fetch new compilers.  If this is needed, there's a good question on 'why and how.'
+#				$0 status [upload]			-- Check the status of some important bits, optionally upload it to termbin since it's a curl-friendly site.
+#				$0 git|gitUpdate			-- Downloads / updates related git repos.  Check gitUpdate() for more info.
 ##
 printHelp() {
-  printf "Syntax options:\n\t\t\t\t$0\t\t\t\t\t-- Guided tutorial\n\t\t\t\t$0 update\t\t\t\t-- Install / Update to latest GShade\n\t\t\t\t$0 list\t\t\t\t-- List games, numbers provided are for use with remove / delete options.\n\t\t\t\t$0 remove <#>\t\t\t-- Remove <#> from database, leave GShade in whatever shape it's currently in.\n\t\t\t\t$0 delete <#>\t\t\t-- Delete GShade from <#> and remove from database.\n<WINEPREFIX=/path/to/prefix>\t$0 ffxiv\t\t\t\t-- Install to FFXIV in provided Wine Prefix or autodetect if no Wine Prefix\n WINEPREFIX=/path/to/prefix\t$0 [dx(?)|opengl] /path/to/game.exe\t-- Install to custom location with designated graphical API version. 'dxgi' is valid here if needed.\n\n\t\t\t\t\t\t\t\t\tNote: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!\n"
+  printf "Syntax options:\n\t\t\t\t$0\t\t\t\t\t\t-- Guided tutorial.\n\t\t\t\t$0 update\t\t\t\t\t-- Install / Update to latest GShade.\n\t\t\t\t$0 list\t\t\t\t\t-- List games, numbers provided are for use with remove / delete options.\n\t\t\t\t$0 lang <en|ja|ko|de|fr|it> [default|#]\t-- Change the language of GShade's interface.  Defaults to the master copy if unspecified.\n\t\t\t\t$0 remove <#>\t\t\t\t-- Remove <#> from database, leave GShade in whatever shape it's currently in.\n\t\t\t\t$0 delete <#>\t\t\t\t-- Delete GShade from <#> and remove from database.\n<WINEPREFIX=/path/to/prefix>\t$0 ffxiv\t\t\t\t\t-- Install to FFXIV in provided Wine Prefix or autodetect if no Wine Prefix.\n WINEPREFIX=/path/to/prefix\t$0 [dx(?)|opengl] /path/to/game.exe\t\t-- Install to custom location with designated graphical API version. 'dxgi' is valid here.\n\n\t\t\t\t\t\t\t\t\tNote: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!\n"
 }
 
 ##
@@ -48,10 +60,10 @@ yesNo() {
 
 readNumber() {
   while true; do
-  read -p "? " -r yn
+  read -p "> " -r yn
     case $yn in
       ''|*[!0-9]*) printf "Unrecognized number: $2";;
-      *) return $yn;;
+      *) return $(echo $yn | tr -d '\r\n');;
     esac
   done
 }
@@ -119,6 +131,95 @@ gitUpdate() {
   popd > /dev/null
 }
 
+fetchCompilers() {
+    if [ ! -d "$GShadeHome/d3dcompiler_47s" ]; then
+      mkdir -p "$GShadeHome/d3dcompiler_47s"
+    fi
+    pushd "$GShadeHome/d3dcompiler_47s" > /dev/null
+    printf "\e[2K\rDownloading 64-bit compiler...  "
+    wget -q https://lutris.net/files/tools/dll/d3dcompiler_47.dll
+    mv d3dcompiler_47.dll d3dcompiler_47.dll.64bit
+    printf "Done!"
+    # This following was sourced from The_Riesi @ https://www.reddit.com/r/linux_gaming/comments/b2hi3g/reshade_working_in_wine_43/
+    printf "\e[2K\rDownloading 32-bit compiler...  "
+    wget -q http://dege.freeweb.hu/dgVoodoo2/D3DCompiler_47.zip && unzip -q D3DCompiler_47.zip && rm D3DCompiler_47.zip
+    mv d3dcompiler_47.dll d3dcompiler_47.dll.32bit
+    printf "Done!"
+    popd > /dev/null
+    printf "\e[2K\rd3dcompiler_47s downloaded\n"
+}
+
+updateLanguage() {
+  gs_lang=$1
+  case $gs_lang in
+    ja | 1) gs_lang=1;;
+    ko | 2) gs_lang=2;;
+    de | 3) gs_lang=3;;
+    fr | 4) gs_lang=4;;
+    it | 5) gs_lang=5;;
+    en | 0 | * ) gs_lang=0;;
+  esac
+  printf "$gs_lang"
+}
+
+##
+# This is all explicit for settings to save and mostly exists to be extendable for future situations like Language being added.
+# Can be passed an argument to specify a file or it will work the default file.
+saveSettings() {
+  [ -z "$1" ] && iniFile="$GShadeHome/GShade.ini" || iniFile="$1"
+  iniSettings+=("Language")
+  doesItExist="$(awk -F'=' '/Language/{print $2}' "$iniFile")"
+  if [[ $doesItExist != "" ]]; then
+    iniSettings+=($doesItExist)
+  else
+    iniSettings+="$(updateLanguage ${LANG:0:2})\r"
+  fi
+#  for i in "PerformanceMode"
+#    do
+#      iniSettings+=("$i")
+#      iniSettings+=("$(awk -F'=' '/'"$i"'/{print $2}' "$iniFile")")
+#  done
+}
+
+restoreSettings() {
+  [ -z "$1" ] && iniFile="$GShadeHome/GShade.ini" || iniFile="$1"
+  confFile=$(printf "$(<$iniFile)")
+  for (( i=0; i<${#iniSettings[@]}; i+=2 ))
+    do
+      confFile="$(printf "$confFile" | sed "/^${iniSettings[i]}/s/=.*$/=${iniSettings[i+1]}/")"
+  done
+  printf "$confFile\n" > "$iniFile"
+}
+
+##
+# For modifying an existing .ini file.
+# Invocation: modifySettings <iniFile> <key> <value> [section]
+# Return values: 2 = $key not found in file, $section specified but not found.
+#		 1 = $key not found in file, $section not specified.
+#		 0 = success.
+# This assumes the iniFile was already confirmed to exist.  If the key is missing, this function will fail unless it's been told which [section] in the file it belongs to.  If the [section] does not exist, the function will fail.
+modifySettings() {
+  iniFile="$1"
+  key="$2"
+  value="$3"
+  [ -z "$4" ] && section="" || section="$4"
+  if [[ "$(awk -F'=' '/'"$key"'/{print $2}' "$iniFile")" == "" ]]; then
+    if [[ $section != "" ]]; then
+      line="$(awk -F'=' '/'\\["$section"\\]'/{print NR}' "$iniFile")"
+      if [[ $line != "" ]]; then
+        sed -i "${line}a $key=$value" "$iniFile"
+      else
+        return 2
+      fi
+    else
+      return 1
+    fi
+  else
+    sed -i "/^${key}/s/=.*$/=$value/" "$iniFile"
+    return 0
+  fi
+}
+
 ##
 # Updater / initial installer.
 # Certain things ONLY happen during initial installation ATM.  The $GShadeHome directory is created, GShade Converter.exe is downloaded, games.db is created, the d3dcompiler_47.dlls (32 and 64-bit) are both downloaded and put in their own directory.
@@ -126,17 +227,7 @@ update() {
   if [ ! -d "$GShadeHome" ]; then
     if (yesNo "GShade initial install not found, would you like to create it?  "); then printf "\nCreating...  "; else printf "\nAborting installation.\n"; exit 1; fi
     mkdir -p "$GShadeHome/reshade-presets/" && pushd "$GShadeHome" > /dev/null && touch games.db && wget -q https://mortalitas.github.io/ffxiv/GShade/GShade%20Converter.exe && popd > /dev/null
-    mkdir -p "$GShadeHome/d3dcompiler_47s"
-    pushd $_ > /dev/null
-    printf "\nFetching d3dcompiler_47.dlls...  32bit..."
-    wget -q https://lutris.net/files/tools/dll/d3dcompiler_47.dll
-    mv d3dcompiler_47.dll d3dcompiler_47.dll.64bit
-    printf "\rFetching d3dcompiler_47.dlls...  64bit...  "
-    # This following was sourced from The_Riesi @ https://www.reddit.com/r/linux_gaming/comments/b2hi3g/reshade_working_in_wine_43/
-    wget -q http://dege.freeweb.hu/dgVoodoo2/D3DCompiler_47.zip && unzip -q D3DCompiler_47.zip && rm D3DCompiler_47.zip
-    mv d3dcompiler_47.dll d3dcompiler_47.dll.32bit
-    popd > /dev/null
-    printf "Done!\n"
+    fetchCompilers
     if ( ! command -v wine >/dev/null 2>&1 -eq 0 ); then printf "\e[31mWine not found in path -- please install wine!\e[0m\n"; fi
     if ( ! command -v md5sum >/dev/null 2>&1 -eq 0 ); then printf "\e[31mmd5sum not found in path -- please install md5sum!\e[0m\n"; fi
   fi
@@ -145,18 +236,20 @@ update() {
     printf "Up to date.\n"
   else
     pushd "$GShadeHome" > /dev/null
-    printf "Updating GShade:  Downloading presets..."
     ##
     # Do preset releases always match GShade updates or should this always update?  Hm.
     wget -q https://github.com/Mortalitas/GShade-Presets/archive/master.zip
-    printf "\rUpdating GShade:  Unzipping...          "
     unzip -qquo master.zip && rm -r master.zip reshade-presets && mv "GShade-Presets-master" "reshade-presets"
     timestamp=$(date +"%Y-%m-%d/%T")
-    if [ -f "version" ]; then performBackup $timestamp; printf "\rUpdating GShade:  Performing backup...  "; [ -d "$GShade/git" ] && gitUpdate $timestamp; fi
+    if [ -f "version" ]; then performBackup $timestamp; [ -d "$GShade/git" ] && gitUpdate $timestamp; fi
+    printf "Saving GShade.ini settings..."
+    saveSettings
     rm -rf "GShade.Latest.zip" "reshade-shaders"
-    printf "\rUpdating GShade:  Downloading shaders..."
     wget -q https://github.com/Mortalitas/GShade-Shaders/releases/latest/download/GShade.Latest.zip
     unzip -qquo GShade.Latest.zip
+    printf "\e[2K\rRestoring any applicable GShade.ini settings...  "
+    restoreSettings
+    printf "Completed!\n"
     old64="$(md5sum GShade64.dll | awk '{ print $1 }')"
     old32="$(md5sum GShade32.dll | awk '{ print $1 }')"
     mv d3d11.dll GShade64.dll
@@ -188,7 +281,7 @@ update() {
       # Hard install update end.
     done < $dbFile
     popd > /dev/null
-    printf "\rGShade-$gshadeCurrent installed.                     \n"
+    printf "GShade-$gshadeCurrent installed.\n"
   fi
 }
 
@@ -206,7 +299,6 @@ listGames() {
   while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
     pushd "$installDir" > /dev/null
     gapiln=$(find -maxdepth 1 -lname "$GShadeHome/GShade*.dll" -exec basename {} ';')
-    # Check if this is a hard install because no links to $GShadeHome were found.
     if [ -z $gapiln ]; then
       fileString="$(file "$gameName")"
       gmd5=""
@@ -215,12 +307,11 @@ listGames() {
       elif printf "$fileString" | grep -q "x86-64"; then
         gmd5="$(md5sum "$GShadeHome/GShade64.dll" | awk '{ print $1 }')"
       fi
-      # Check dxgi and opengl32 before we start hitting up find.
+      # Check dxgi and opengl32 before we start hitting find up.
       if [ -f "dxgi.dll" ] && [ "$gmd5" == "$(md5sum "dxgi.dll" | awk '{ print $1 }')" ]; then gapiln="dxgi.dll"; fi
-      if [ -z "$gapiln" ] && [ -f "opengl32.dll" ] && [ "$gmd5" == "$(md5sum "opengl32.dll" | awk '{ print $1 }')" ]; then gapiln="opengl32.dll"; fi
-      # find it is.  Look for any d3d*.dll file excluding d3dcompiler_47.dll and check against the md5sum.
-      if [ -z "$gapiln" ] && [ -f "$(basename $(find -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \)) 2>&1)" ] && [ "$gmd5" == "$(md5sum "$(basename $(find -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \)))" | awk '{ print $1 }')" ]; then gapiln="$(basename $(find -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \)))"; fi
-    fi # End hard install check.
+      if [ -z "$gapi" ] && [ -f "opengl32.dll" ] && [ "$gmd5" == "$(md5sum "opengl32.dll" | awk '{ print $1 }')" ]; then gapiln="opengl32.dll"; fi
+      if [ -z "$gapi" ] && [ -f "$(basename $(find -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \)) 2>&1)" ] && [ "$gmd5" == "$(md5sum "$(basename $(find -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \)))" | awk '{ print $1 }')" ]; then gapiln="$(basename $(find -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \)))"; fi
+    fi
     gamesList="$gamesList$((++i))) Game:\t\t$([ -f "$installDir/$gameName" ] && printf "\e[32m" || printf "\e[31m")$gameName\e[0m\t\t$([ -L "$installDir/$gapiln" ] && printf "\e[32m[$gapiln -> $([ ! -f $(readlink -f "$installDir/$gapiln") ] && printf "\e[0m\e[31m")$(basename "$(readlink -f "$installDir/$gapiln")")\e[0m\e[32m]\e[0m" || ([ -f "$installDir/$gapiln" ] && printf "\e[33m[$gapiln]\e[0m" || printf "\e[31mGShade symlink not found!\e[0m")) $([ ! -z "$gitInstall" ] && printf "\t\t\e[33m-- GIT INSTALLATION\e[0m")\n\tInstalled to:\t$([ ! -d "$installDir" ] && printf "\e[31m")${installDir/#$HOME/"\$HOME"}\e[0m\n\tWINEPREFIX:\t$([ ! -d "$prefixDir" ] && printf "\e[31m")${prefixDir/#$HOME/"\$HOME"}\e[0m\n"
   done < $dbFile
   return 0 
@@ -239,6 +330,25 @@ recordGame() {
   record="$gameExe=$gameLoc;$WINEPREFIX;$([ $git == 0 ] && printf "0")"
   printf "$record\n" >> $dbFile
   return 0
+}
+
+##
+# Invokation: getGame #
+# Pulls the relevant variables for a game based on line number from games.db.
+getGame() {
+  [ -z "$1" ] && return 1 || line="$1"
+  OldIFS="$IFS"
+  IFS='=;'
+  set -- `awk -F '=;' 'NR=='"$line"' {print $1, $2, $3, $4}' "$HOME/.local/share/GShade/games.db"`
+  IFS="$OldIFS"
+  gameExe=$1 gameLoc=$2 WINEPREFIX=$3 git=$4
+}
+
+##
+# Invokation: forgetGame
+# Just sets everything to default values that getGame sets.  More of a safety net than a necessity currently.
+forgetGame() {
+  gameExe="" gameLoc="" WINEPREFIX="" git=1
 }
 
 ##
@@ -287,7 +397,7 @@ deleteGame() {
 installGame() {
   # Get to the WINEPREFIX to make sure it's recorded as absolute and not relative.
   pushd $WINEPREFIX > /dev/null; WINEPREFIX="$(pwd)/"; popd > /dev/null
-#  WINEPREFIX="${WINEPREFIX//+(\/)//}"		# Legacy because it didn't account for relative directories, but interesting.  Requires bash v4 and `shopt -s extglob` command preceeding it.
+#  WINEPREFIX="${WINEPREFIX//+(\/)//}"		# Legacy, but interesting to remember.
   pushd "$gameLoc" > /dev/null
   # Clean up an old install before the new soft links and reg edits are re-added.  Mostly to deal with changing gapi's.
   cleanWineLinks
@@ -311,7 +421,6 @@ installGame() {
     printf "Game:\t\t$gameExe$([ ! -z "$git" ] && printf "\t -- GIT INSTALLATION")\nInstalled to:\t$gameLoc\nWINEPREFIX:\t$WINEPREFIX\n" > "$backupDir/gameInfo.txt"
   fi
   rsync -a "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Presets/" || printf "reshade-presets")" "./$([ $git == 0 ] && printf "reshade-presets/")"
-  mkdir -p "reshade-presets/Custom" 2>&1
   ln -sfn "$GShadeHome/GShade Converter.exe" "GShade Converter.exe"
   if [ $? != 0 ] || [ ! -L "GShade Converter.exe" ]; then cp -a "$GShadeHome/GShade Converter.exe" "GShade Converter.exe"; fi
   recordGame
@@ -376,7 +485,7 @@ XIVinstall() {
 }
 
 ##
-# Walkthrough for custom game option selected from the general menu.  Gets input for $gapi, $WINEPREFIX, $gameExe, and $exeFile.
+# Walkthrough for custom game option selected from the general menu.  Gets input for $gapi, $WINEPREFIX, $gameExe, and $exeFile (which is really $fullPathToExeFile).
 customGamePrompt() {
   while true; do
     read -p "What graphics API is the game using? (opengl,dx9,dx10,dx11,dx12): " -r input
@@ -425,7 +534,7 @@ customGame() {
 ##
 # Sometimes the menu should get repeated, sometimes not.  Easiest to call a function for it.
 menu() {
-  printf "Welcome to GShade!  Please select an option:\n\t1) Check for an update to GShade\n\t2) Install to a custom game\n\tF) Attempt auto-install for FFXIV\n\tB) Create a backup of existing GShade game installations\n\tL) List games GShade is installed to\n\tR) Remove game from installed games list\n\tD) Delete GShade from game and remove from list\n\tQ) Quit\n"
+  printf "Welcome to GShade!  Please select an option:\n\t1) Check for an update to GShade\n\t2) Install to a custom game\n\tF) Attempt auto-install for FFXIV\n\tB) Create a backup of existing GShade game installations\n\tS) Show games GShade is installed to\n\tL) Change GShade's language\n\tR) Remove game from installed games list\n\tD) Delete GShade from game and remove from list\n\t0) Redownload compilers\n\tQ) Quit\n"
 }
 
 ##
@@ -434,17 +543,17 @@ stepByStep() {
   [[ ! -d "$GShadeHome" ]] && update
   menu
   while true; do
-    read -p "? " -n 1 -r yn
+    read -p "> " -n 1 -r yn
     case $yn in
       [1]* ) printf "\n"; update;;
       [2]* ) printf "\n"; customGamePrompt; customGame; break;;
       [Ff]* ) XIVinstall; break;;
       [Bb]* ) performBackup; break;;
-      [Ll]* ) listGames; if [ $? ]; then printf "\n$gamesList"; else printf "\nNo games yet installed to.\n"; fi;;
+      [Ss]* ) listGames; if [ $? ]; then printf "\n$gamesList"; else printf "\nNo games yet installed to.\n"; fi;;
       [Rr]* ) listGames  # Remove from list & untrack.
         if [ $? ]; then
           printf "\n$gamesList"
-          $(readNumber); selection=$?
+          readNumber; selection=$?
           removeGame $selection
         else
           printf "\nNo games yet installed to remove.\n"
@@ -453,13 +562,48 @@ stepByStep() {
       [Dd]* ) listGames  # Delete from game / list
         if [ $? ]; then
           printf "\n$gamesList"
-          $(readNumber); selection=$?
+          readNumber; selection=$?
           deleteGame $selection
 	else
 	  printf "\nNo games yet installed to remove.\n"
         fi
 	menu;;
-      [Ss]* ) printf "\n"; debugInfo upload; exit 0;;
+      [Ll]* ) listGames  # Change GShade's language in game.
+        if [ $? ]; then
+	  printf "\n0) Default GShade.ini (for future installations)\n$gamesList"
+	  readNumber; selection=$?
+	  if [ $selection -eq 0 ]; then
+	    gameLoc="$GShadeHome"
+	  else
+  	    getGame $selection
+	  fi
+	  if [ ! -f "$gameLoc/GShade.ini" ]; then
+	    printf "\nNo GShade.ini found.  Please confirm GShade is working within this install.\n"
+	  else
+	    read -p "Please choose a language (en, ja, ko, de, fr, it): " -n 2 -r langIn
+	    lang="$(echo "$langIn" | tr '[:upper:]' '[:lower:]')"
+            case $lang in
+	      en | ja | ko | de | fr | it) modifySettings "$gameLoc/GShade.ini" "Language" "$(updateLanguage $lang)" "GENERAL"
+	        printf "\nUpdated!\n"
+	    	;;
+	      *) printf "Unknown language.  Please retry.";;
+	    esac
+	  fi
+        else
+	  printf "\nUpdating default GShade.ini -- this will affect all future installs.\n"
+	  read -p "Please choose a language (en, ja, ko, de, fr, it): " -n 2 -r langIn
+	    lang="$(echo "$langIn" | tr '[:upper:]' '[:lower:]')"
+            case $lang in
+	      en | ja | ko | de | fr | it) modifySettings "$GShadeHome/GShade.ini" "Language" "$(updateLanguage $lang)" "GENERAL"
+	        printf "\nUpdated!\n"
+	    	;;
+	      *) printf "Unknown language.  Please retry.";;
+	    esac
+	fi
+      forgetGame
+      menu;;
+      [0]* ) printf "\n"; fetchCompilers; menu;;
+      [Ii]* ) printf "\n"; debugInfo upload; exit 0;;
       [Qq]* ) printf "\nBye!\n"; break;;
       * ) printf "\tInvalid option.\n";;
     esac
@@ -468,9 +612,7 @@ stepByStep() {
 
 ##
 # *Eyetwitch.*
-# All output here respects swapping user's home directory info with $HOME.  Also, calling `debugInfo upload` will upload to termbin.com instead of locally.
-#
-# Output format:
+# All output here respects swapping user's home directory info with $HOME.
 #
 # Installation location:  $GShadeHome
 # Installation version:   Contents of $GShadeHome/version
@@ -490,12 +632,12 @@ debugInfo(){
   md5sum --status --ignore-missing -c <<<"b0ae3aa9dd1ebd60bdf51cb94834cd04 d3dcompiler_47s/d3dcompiler_47.dll.64bit"
   N64=$?
   output=$(printf "Installation location:\t${GShadeHome/#$HOME/"\$HOME"}/\nInstallation version:\t$(cat $GShadeHome/version)\nd3dcompiler_47 32-bit:\t$([ $PS -eq 0 ] && printf "\e[32mOK" || printf "\e[31mmd5sum failure")\e[0m\nd3dcompiler_47 64-bit:\t$([ $N64 -eq 0 ] && printf "\e[32mOK" || printf "\e[31mmd5sum failure")\e[0m\nWine version:\t\t$($( command -v wine >/dev/null 2>&1 -eq 0 ) && printf "\e[32m$(wine --version)\e[0m" || printf "\e[31mNot installed\e0m")")
-  listGames; [ $? ] && output+=$(printf "\ngames.db:\n$gamesList") || output+=$(printf "\ngames.db:\tEmpty or does not currently exist.")
+  listGames; [ $? ] && output+=$(printf "\ngames.db:\n${gamesList/#$HOME/"\$HOME"}") || output+=$(printf "\ngames.db:\tEmpty or does not currently exist.")
   popd > /dev/null
   if [ "$1" != "upload" ]; then
     printf "$output\n"
   else
-    uploadLoc=$(printf "$output\n" | (exec 3<>/dev/tcp/termbin.com/9999; cat >&3; cat <&3; exec 3<&-))
+    uploadLoc=$(printf "$output" | (exec 3<>/dev/tcp/termbin.com/9999; cat >&3; cat <&3; exec 3<&-))
     printf "$uploadLoc\n"
   fi
   exit 0
@@ -504,14 +646,17 @@ debugInfo(){
 ##
 # Command line options:
 case $1 in
-  update | -u)
+  update)
   update
+  exit 0;;
+  fetchCompilers)
+  fetchCompilers
   exit 0;;
   ffxiv | FFXIV)
   if [ ! -d "$GShadeHome" ]; then update; fi
   XIVinstall
   exit 0;;
-  --help|-h|/h)
+  --help|-h|/h|help)
   printHelp
   exit 0;;
   opengl | gl) gapi=opengl32;;
@@ -522,10 +667,10 @@ case $1 in
   dxgi | gi) gapi=dxgi;;
   dx*) printf "Unrecognized graphics API version: $1\n"
   exit 1;;
-  backup | -b)
+  backup)
   performBackup;
   exit 0;;
-  list | -l)
+  list | show)
   listGames; [ $? ] && printf "$gamesList" || printf "No games yet installed to.\n"
   exit 0;;
   remove | rm)
@@ -540,10 +685,23 @@ case $1 in
     *) deleteGame $2; exit 0;;
   esac
   exit 0;;
+  lang | language)
+  lang="$(echo "$2" | tr '[:upper:]' '[:lower:]')"
+  case $lang in
+    en | ja | ko | de | fr | it) numberLang=$(updateLanguage "$lang");;
+    *) printf "Unknown language, '$2'.  Please retry."; exit 1;;
+  esac
+  case $3 in
+    default | 0) gameLoc="$GShadeHome";;
+    ''|*[!0-9]*) printf "Unrecognized installation candidate: $3"; exit 1;;
+    *) getGame "$3"
+  esac
+  modifySettings "$gameLoc/GShade.ini" "Language" "$numberLang" "GENERAL"
+  exit 0;;
   git | gitUpdate)
   gitUpdate
   exit 0;;
-  debug | status | -s)
+  debug | status)
   debugInfo $2 
   exit 0;;
   "")
