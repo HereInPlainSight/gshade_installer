@@ -245,7 +245,7 @@ update() {
     printf "Saving GShade.ini settings..."
     saveSettings
     rm -rf "GShade.Latest.zip" "reshade-shaders"
-    wget https://github.com/Mortalitas/GShade/releases/latest/download/GShade.Latest.zip
+    wget -q https://github.com/Mortalitas/GShade/releases/latest/download/GShade.Latest.zip
     unzip -qquo GShade.Latest.zip
     printf "\e[2K\rRestoring any applicable GShade.ini settings...  "
     restoreSettings
@@ -260,10 +260,10 @@ update() {
     while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
       if [ -z "$gitInstall" ]; then gitInstall=1; fi
       if [ "$gitInstall" -eq 1 ]; then
-        cp -rf "reshade-presets/*" "$installDir/reshade-presets/"
+        cp -rf "reshade-presets/" "$installDir/"
       fi
       # Hard install upgrade begin.
-      if [[ $(find "$installDir" -maxdepth 1 -lname "$GShadeHome/" -print) == "" ]]; then
+      if [[ $(find "$installDir" -maxdepth 1 -lname "$GShadeHome/*.dll" -print) == "" ]]; then
         gArch=""
 	md5goal=""
         if printf "$installDir/$gameName" | grep -q "80386"; then
@@ -271,7 +271,7 @@ update() {
         elif printf "$installDir/$gameName" | grep -q "x86-64"; then
           gArch="64"; md5goal="$old64"
         fi
-        gName=$(basename $(find "$installDir" -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \)))
+        gName=$(basename "$(find "$installDir" -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))")
         if [ -f "$installDir/opengl32.dll" ]; then gName="opengl32.dll"; fi
         if [[ $gName != "" ]]; then
           if [[ "$(md5sum "$installDir/${gName}" | awk '{ print $1 }')" == "$md5goal" ]]; then cp -f "GShade${gArch}.dll" "$installDir/${gName}.dll"; fi
