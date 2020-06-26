@@ -9,22 +9,22 @@ Download the script and run it.  There is a basic menu.
 If you would prefer to run the commands directly, the help menu should give you the basics (`./gshade_installer.sh --help`):
 ```
 Syntax options:
-				./gshade_installer.sh						-- Guided tutorial
-				./gshade_installer.sh update					-- Install / Update to latest GShade
-				./gshade_installer.sh list					-- List games, numbers provided are for use with remove / delete options.
-				./gshade_installer.sh lang <en|ja|ko|de|fr|it> [default|#]	-- Change the language of GShade's interface.  Defaults to the master copy if unspecified.
-				./gshade_installer.sh remove <#>				-- Remove <#> from database, leave GShade in whatever shape it's currently in.
-				./gshade_installer.sh delete <#>				-- Delete GShade from <#> and remove from database.
-<WINEPREFIX=/path/to/prefix>	./gshade_installer.sh ffxiv					-- Install to FFXIV in provided Wine Prefix or autodetect if no Wine Prefix
- WINEPREFIX=/path/to/prefix	./gshade_installer.sh [dx(?)|opengl] /path/to/game.exe		-- Install to custom location with designated graphical API version. 'dxgi' is valid here if needed.
+                                ./gshade_installer.sh                                           -- Guided tutorial
+                                ./gshade_installer.sh update                                    -- Install / Update to latest GShade
+                                ./gshade_installer.sh list                                      -- List games, numbers provided are for use with remove / delete options.
+                                ./gshade_installer.sh lang <en|ja|ko|de|fr|it> [default|#]      -- Change the language of GShade's interface.  Defaults to the master copy if unspecified.
+                                ./gshade_installer.sh remove <#>                                -- Remove <#> from database, leave GShade in whatever shape it's currently in.
+                                ./gshade_installer.sh delete <#>                                -- Delete GShade from <#> and remove from database.
+<WINEPREFIX=/path/to/prefix>    ./gshade_installer.sh ffxiv                                     -- Install to FFXIV in provided Wine Prefix or autodetect if no Wine Prefix
+ WINEPREFIX=/path/to/prefix     ./gshade_installer.sh [dx(?)|opengl] /path/to/game.exe          -- Install to custom location with designated graphical API version. 'dxgi' is valid here if needed.
 
-									Note: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!
+                                                                        Note: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!
 ```
 You can also just clone the repo and run the script from within it.
 
 ### Prerequisites
 
-To my knowledge this should work in virtually any Linux install that has access to bash and basic utilities.  wget, ln, find, awk, sed, unzip.  You need a local copy of WINE installed -- the version itself doesn't matter, but if you'll be using your local copy of WINE to PLAY the game, you'll need 4.2 or above to get shaders to work.
+To my knowledge this should work in virtually any Linux install that has access to bash and basic utilities.  `wget`, `ln`, `find`, `awk`, `sed`, `unzip`.  You need a local copy of WINE installed -- the version itself doesn't matter, but if you'll be using your local copy of WINE to ***play*** the game, you'll need 4.2 or above to get shaders to work.
 
 ### Installing
 
@@ -41,23 +41,8 @@ WINEPREFIX="$HOME/.steam/steam/steamapps/compatdata/39210/pfx" ./gshade_installe
 ```
 
 If you're having any problems, you can check `./gshade_installer.sh debug`, which will print something similar to this:
-```
-Installation location:	$HOME/.local/share/GShade/
-Installation version:	2.1.0.9
-d3dcompiler_47 32-bit:	OK
-d3dcompiler_47 64-bit:	OK
-Wine version:		wine-5.0 (Staging)
-games.db:
-1) Game:		BloodstainedRotN-Win64-Shipping.exe		[d3d11.dll -> GShade64.dll] 
-	Installed to:	$HOME/.steam/steam/steamapps/common/Bloodstained Ritual of the Night/BloodstainedRotN/Binaries/Win64/
-	WINEPREFIX:	$HOME/.steam/steam/steamapps/compatdata/692850/pfx/
-2) Game:		COTM.exe		[d3d9.dll -> GShade32.dll] 
-	Installed to:	$HOME/.steam/steam/steamapps/common/Bloodstained Curse of the Moon/exe/
-	WINEPREFIX:	$HOME/.steam/steam/steamapps/compatdata/838310/pfx/
-3) Game:		ffxiv_dx11.exe		[d3d11.dll -> GShade64.dll]
-	Installed to:	$HOME/Games/Lutris/final-fantasy-xiv-a-realm-reborn/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/
-	WINEPREFIX:	$HOME/Games/Lutris/final-fantasy-xiv-a-realm-reborn/
-```
+![Debug example](https://i.imgur.com/C0nCWOo.png)
+Green is good.  Red indicates an error with that component.  Yellow is informational, such as a 'hard install' without symlinks.  Neither good nor bad -- just something to be aware of when troubleshooting.
 
 You can get just the games.db list by requesting it with `./gshade_installer.sh list`.  You can remove an item from the list with `./gshade_installer.sh remove <#>`, or delete the GShade installation from the game with `./gshade_installer.sh delete <#>`.
 
