@@ -245,7 +245,7 @@ update() {
     printf "Saving GShade.ini settings..."
     saveSettings
     rm -rf "GShade.Latest.zip" "reshade-shaders"
-    wget -q https://github.com/Mortalitas/GShade-Shaders/releases/latest/download/GShade.Latest.zip
+    wget https://github.com/Mortalitas/GShade/releases/latest/download/GShade.Latest.zip
     unzip -qquo GShade.Latest.zip
     printf "\e[2K\rRestoring any applicable GShade.ini settings...  "
     restoreSettings
@@ -259,7 +259,7 @@ update() {
     # Have to update reshade-presets in games' directories and update any hard-installs.
     while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
       if [ -z "$gitInstall" ]; then gitInstall=1; fi
-      if ( $gitInstall -eq 1 ); then
+      if [ "$gitInstall" -eq 1 ]; then
         cp -rf "reshade-presets/*" "$installDir/reshade-presets/"
       fi
       # Hard install upgrade begin.
@@ -298,7 +298,7 @@ listGames() {
   fi
   while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
     pushd "$installDir" > /dev/null
-    gapiln=$(find -maxdepth 1 -lname "$GShadeHome/GShade*.dll" -exec basename {} ';')
+    gapiln=$(find -maxdepth 1 -name "*.dll" -lname "$GShadeHome/GShade*.dll" -exec basename {} ';')
     if [ -z $gapiln ]; then
       fileString="$(file "$gameName")"
       gmd5=""
@@ -312,6 +312,7 @@ listGames() {
       if [ -z "$gapi" ] && [ -f "opengl32.dll" ] && [ "$gmd5" == "$(md5sum "opengl32.dll" | awk '{ print $1 }')" ]; then gapiln="opengl32.dll"; fi
       if [ -z "$gapi" ] && [ -f "$(basename $(find -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \)) 2>&1)" ] && [ "$gmd5" == "$(md5sum "$(basename $(find -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \)))" | awk '{ print $1 }')" ]; then gapiln="$(basename $(find -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \)))"; fi
     fi
+    popd > /dev/null
     gamesList="$gamesList$((++i))) Game:\t\t$([ -f "$installDir/$gameName" ] && printf "\e[32m" || printf "\e[31m")$gameName\e[0m\t\t$([ -L "$installDir/$gapiln" ] && printf "\e[32m[$gapiln -> $([ ! -f $(readlink -f "$installDir/$gapiln") ] && printf "\e[0m\e[31m")$(basename "$(readlink -f "$installDir/$gapiln")")\e[0m\e[32m]\e[0m" || ([ -f "$installDir/$gapiln" ] && printf "\e[33m[$gapiln]\e[0m" || printf "\e[31mGShade symlink not found!\e[0m")) $([ ! -z "$gitInstall" ] && printf "\t\t\e[33m-- GIT INSTALLATION\e[0m")\n\tInstalled to:\t$([ ! -d "$installDir" ] && printf "\e[31m")${installDir/#$HOME/"\$HOME"}\e[0m\n\tWINEPREFIX:\t$([ ! -d "$prefixDir" ] && printf "\e[31m")${prefixDir/#$HOME/"\$HOME"}\e[0m\n"
   done < $dbFile
   return 0 
