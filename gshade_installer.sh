@@ -252,6 +252,7 @@ update() {
 	while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
 	  pushd "$installDir" > /dev/null
 	  mv "reshade-presets" "gshade-presets"
+	  sed -i "s/reshade-/gshade-/" "GShade.ini"
 	  rshade=$(find -maxdepth 1 -name "reshade-shaders" -lname "$GShadeHome/reshade-shaders" -exec basename {} ';')
 	  if [ -z $rshade ]; then
 	    mv "reshade-shaders" "gshade-shaders"
@@ -272,15 +273,13 @@ update() {
     printf "Saving GShade.ini settings..."
     saveSettings
     rm -rf "GShade.Latest.zip" "gshade-shaders"
+    old64="$(md5sum GShade64.dll | awk '{ print $1 }')"
+    old32="$(md5sum GShade32.dll | awk '{ print $1 }')"
     wget -q https://github.com/Mortalitas/GShade/releases/latest/download/GShade.Latest.zip
     unzip -qquo GShade.Latest.zip
     printf "\e[2K\rRestoring any applicable GShade.ini settings...  "
     restoreSettings
     printf "Completed!\n"
-    old64="$(md5sum GShade64.dll | awk '{ print $1 }')"
-    old32="$(md5sum GShade32.dll | awk '{ print $1 }')"
-    mv d3d11.dll GShade64.dll
-    mv d3d9.dll GShade32.dll
     printf "$gshadeCurrent\n" > version
     ##
     # Have to update gshade-presets in games' directories and update any hard-installs.
