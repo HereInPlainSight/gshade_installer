@@ -77,7 +77,6 @@ performBackup() {
   [ -z "$1" ] && timestamp=$(date +"%Y-%m-%d/%T") || timestamp="$1"
   mkdir -p "$GShadeHome/Backups/$timestamp" && pushd "$_" > /dev/null
   cp -r "$GShadeHome/gshade-shaders" "./"
-  [ -d "$GShadeHome/git/GShade-Shaders" ] && mkdir git && cp -r "$GShadeHome/git/GShade-Shaders" "git/"
   listGames; [ ! $? ] && return 0;
   while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
     backupDir="$GShadeHome/Backups/$timestamp/$gameName"
@@ -90,10 +89,6 @@ performBackup() {
   popd > /dev/null
 }
 
-###
-## Scrub through git options -- the git shaders repo is gone.
-## Presets still exist.  But shaders needs to be culled.
-###
 git=1 # Git always fails unless explicitly requested.  Hiding it so most the git stuff is all in the same place.
 ##
 # Unsupported yadda yadda.  $0 git | $0 gitUpdate.  All uses of git in a prefix will be reflected in output.
@@ -102,12 +97,10 @@ gitUpdate() {
   [ ! -d "$GShadeHome/git" ] && mkdir -p "$GShadeHome/git"
   backupDir="$GShadeHome/Backups/$timestamp/"
   pushd $GShadeHome/git > /dev/null
-  if [ ! -d "$GShadeHome/git/GShade-Shaders" ] || [ ! -d "$GShadeHome/git/GShade-Presets" ]; then
+  if [ ! -d "$GShadeHome/git/GShade-Presets" ]; then
     git clone "https://github.com/Mortalitas/GShade-Presets.git"
-    git clone "https://github.com/Mortalitas/GShade-Shaders.git"
   else
     git -C "GShade-Presets" fetch
-    git -C "GShade-Shaders" fetch
     if [ $(git -C "GShade-Presets" rev-parse HEAD) != $(git -C "GShade-Presets" rev-parse @{u}) ]; then
       git -C "GShade-Presets" reset --hard -q
       git -C "GShade-Presets" pull -q
@@ -125,11 +118,6 @@ gitUpdate() {
 	  rsync -a "GShade-Presets/" "$installDir/gshade-presets/"
         fi
       done < $dbFile
-    fi
-    if [ $(git -C "GShade-Shaders" rev-parse HEAD) != $(git -C "GShade-Shaders" rev-parse @{u}) ]; then
-      [ ! -d "$backupDir/git" ] && mkdir -p "$backupDir/git" && cp -r "GShade-Shaders" "$backupDir/git/"
-      git -C "GShade-Shaders" reset --hard -q
-      git -C "GShade-Shaders" pull -q
     fi
   fi
   popd > /dev/null
@@ -258,7 +246,7 @@ update() {
 	    mv "reshade-shaders" "gshade-shaders"
 	  else
 	    find -maxdepth 1 -lname "$GShadeHome/reshade-shaders" -delete
-	    ln -sfn "$GShadeHome/$([ $gitInstall == 0 ] && printf "git/GShade-Shaders" || printf "gshade-shaders")" "gshade-shaders"
+	    ln -sfn "$GShadeHome/gshade-shaders" "gshade-shaders"
 	  fi
 	  popd > /dev/null
 	done < $dbFile
@@ -435,10 +423,10 @@ installGame() {
   export WINEPREFIX
   wine reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v d3dcompiler_47 /d native /f >/dev/null 2>&1
   wine reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v ${gapi} /d native,builtin /f >/dev/null 2>&1
-  if [ ! -f "GShade.ini" ]; then cp "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Shaders/")GShade.ini" "GShade.ini"; fi
-  ln -sfn "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Shaders" || printf "gshade-shaders")" "gshade-shaders"
-  if [ $? != 0 ] || [ ! -L "gshade-shaders" ]; then cp -a "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Shaders" || printf "gshade-shaders")" "gshade-shaders"; fi
-  ln -sfn "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Shaders/")notification.wav" "notification.wav"
+  if [ ! -f "GShade.ini" ]; then cp "$GShadeHome/GShade.ini" "GShade.ini"; fi
+  ln -sfn "$GShadeHome/gshade-shaders" "gshade-shaders"
+  if [ $? != 0 ] || [ ! -L "gshade-shaders" ]; then cp -a "$GShadeHome/gshade-shaders" "gshade-shaders"; fi
+  ln -sfn "$GShadeHome/notification.wav" "notification.wav"
   if [ $? != 0 ] || [ ! -L "notification.wav" ]; then cp -a "$GShadeHome/notification.wav" "notification.wav"; fi
   if [ -d "$gameLoc/gshade-presets" ]; then
     timestamp=$(date +"%Y-%m-%d/%T")
@@ -751,7 +739,7 @@ gameExe="$(basename "$exeFile")"
 if [ "${gameExe##*.}" != "exe" ]; then printf "$gameExe: Not a .exe file.\n"; exit 1; fi
 
 # If there's an extra argument AND it's 'git' AND the git directories already exist... fine.  You get git.
-if [ ! -z $3 ] && [ $3 == "git" ] && [ -d "$GShadeHome/git/GShade-Shaders" ] && [ -d "$GShadeHome/git/GShade-Presets" ]; then git=0; fi
+if [ ! -z $3 ] && [ $3 == "git" ] && [ -d "$GShadeHome/git/GShade-Presets" ]; then git=0; fi
 
 customGame
 
