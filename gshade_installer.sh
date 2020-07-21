@@ -69,14 +69,14 @@ readNumber() {
 }
 
 ##
-# Backup GShade's reshade-shaders (and git shaders if they exist), as well as each games' reshade-presets/ and GShade.ini.
+# Backup GShade's gshade-shaders (and git shaders if they exist), as well as each games' gshade-presets/ and GShade.ini.
 # Backup directory per game is Backups/$year-$month-$day/$time/$game.exe/
 # If more than one install has the same base game name (ex, both Lutris and Wine versions of XIV installed), subsequent directories will have a random string generated to keep them separate.
 # gameInfo.txt will be created per-game directory to help sorting out original path and prefixes.  These files will contain FULL directory information, with no variable substitutions.
 performBackup() {
   [ -z "$1" ] && timestamp=$(date +"%Y-%m-%d/%T") || timestamp="$1"
   mkdir -p "$GShadeHome/Backups/$timestamp" && pushd "$_" > /dev/null
-  cp -r "$GShadeHome/reshade-shaders" "./"
+  cp -r "$GShadeHome/gshade-shaders" "./"
   [ -d "$GShadeHome/git/GShade-Shaders" ] && mkdir git && cp -r "$GShadeHome/git/GShade-Shaders" "git/"
   listGames; [ ! $? ] && return 0;
   while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
@@ -84,12 +84,16 @@ performBackup() {
     [ ! -d "$backupDir" ] && mkdir "$backupDir" || backupDir=$(mktemp -d -t "$gameName-XXXXXXXXXX" --tmpdir=./)
     printf "Game:\t\t$gameName$([ ! -z "$gitInstall" ] && printf "\t -- GIT INSTALLATION")\nInstalled to:\t$installDir\nWINEPREFIX:\t$prefixDir\n" > "$backupDir/gameInfo.txt"
     cp "$installDir/GShade.ini" "$backupDir/"
-    cp -r "$installDir/reshade-presets" "$backupDir/"
-    cp -r "$GShadeHome/reshade-presets" "$installDir/"
+    cp -r "$installDir/gshade-presets" "$backupDir/"
+    cp -r "$GShadeHome/gshade-presets" "$installDir/"
   done < $dbFile
   popd > /dev/null
 }
 
+###
+## Scrub through git options -- the git shaders repo is gone.
+## Presets still exist.  But shaders needs to be culled.
+###
 git=1 # Git always fails unless explicitly requested.  Hiding it so most the git stuff is all in the same place.
 ##
 # Unsupported yadda yadda.  $0 git | $0 gitUpdate.  All uses of git in a prefix will be reflected in output.
@@ -116,9 +120,9 @@ gitUpdate() {
             [ ! -d "$gameBackupDir" ] && mkdir "$gameBackupDir" || gameBackupDir=$(mktemp -d -t "$gameName-XXXXXXXXXX" --tmpdir=./)
             printf "Game:\t\t$gameName\t -- GIT INSTALLATION\nInstalled to:\t$installDir\nWINEPREFIX:\t$prefixDir\n" > "$backupDir/gameInfo.txt"
             cp "$installDir/GShade.ini" "$gameBackupDir/"
-            rsync -a "$installDir/reshade-presets/" "$gameBackupDir/"
+            rsync -a "$installDir/gshade-presets/" "$gameBackupDir/"
 	  fi
-	  rsync -a "GShade-Presets/" "$installDir/reshade-presets/"
+	  rsync -a "GShade-Presets/" "$installDir/gshade-presets/"
         fi
       done < $dbFile
     fi
@@ -226,7 +230,7 @@ modifySettings() {
 update() {
   if [ ! -d "$GShadeHome" ]; then
     if (yesNo "GShade initial install not found, would you like to create it?  "); then printf "\nCreating...  "; else printf "\nAborting installation.\n"; exit 1; fi
-    mkdir -p "$GShadeHome/reshade-presets/" && pushd "$GShadeHome" > /dev/null && touch games.db && wget -q https://mortalitas.github.io/ffxiv/GShade/GShade%20Converter.exe && popd > /dev/null
+    mkdir -p "$GShadeHome/gshade-presets/" && pushd "$GShadeHome" > /dev/null && touch games.db && wget -q https://mortalitas.github.io/ffxiv/GShade/GShade%20Converter.exe && popd > /dev/null
     fetchCompilers
     if ( ! command -v wine >/dev/null 2>&1 -eq 0 ); then printf "\e[31mWine not found in path -- please install wine!\e[0m\n"; fi
     if ( ! command -v md5sum >/dev/null 2>&1 -eq 0 ); then printf "\e[31mmd5sum not found in path -- please install md5sum!\e[0m\n"; fi
@@ -237,14 +241,37 @@ update() {
   else
     pushd "$GShadeHome" > /dev/null
     ##
+    # The Great 3.0 Update:
+    # Rename the reshade-presets directory to gshade-presets everywhere.
+    # Rename gshade-shaders in $GShadeHome the same way and relink everywhere.  Unless it's a hard install -- then rename everywhere.
+    if [[ -f "$GShadeHome/version" ]] && [[ $(<"$GShadeHome/version") < 3 ]]; then
+      mv "reshade-presets" "gshade-presets"
+      mv "reshade-shaders" "gshade-shaders"
+      listGames;
+      if [ $? ]; then
+	while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
+	  pushd "$installDir" > /dev/null
+	  mv "reshade-presets" "gshade-presets"
+	  rshade=$(find -maxdepth 1 -name "reshade-shaders" -lname "$GShadeHome/reshade-shaders" -exec basename {} ';')
+	  if [ -z $rshade ]; then
+	    mv "reshade-shaders" "gshade-shaders"
+	  else
+	    find -maxdepth 1 -lname "$GShadeHome/reshade-shaders" -delete
+	    ln -sfn "$GShadeHome/$([ $gitInstall == 0 ] && printf "git/GShade-Shaders" || printf "gshade-shaders")" "gshade-shaders"
+	  fi
+	  popd > /dev/null
+	done < $dbFile
+      fi
+    fi
+    ##
     # Do preset releases always match GShade updates or should this always update?  Hm.
     wget -q https://github.com/Mortalitas/GShade-Presets/archive/master.zip
-    unzip -qquo master.zip && rm -r master.zip reshade-presets && mv "GShade-Presets-master" "reshade-presets"
+    unzip -qquo master.zip && rm -r master.zip gshade-presets && mv "GShade-Presets-master" "gshade-presets"
     timestamp=$(date +"%Y-%m-%d/%T")
     if [ -f "version" ]; then performBackup $timestamp; [ -d "$GShade/git" ] && gitUpdate $timestamp; fi
     printf "Saving GShade.ini settings..."
     saveSettings
-    rm -rf "GShade.Latest.zip" "reshade-shaders"
+    rm -rf "GShade.Latest.zip" "gshade-shaders"
     wget -q https://github.com/Mortalitas/GShade/releases/latest/download/GShade.Latest.zip
     unzip -qquo GShade.Latest.zip
     printf "\e[2K\rRestoring any applicable GShade.ini settings...  "
@@ -256,11 +283,11 @@ update() {
     mv d3d9.dll GShade32.dll
     printf "$gshadeCurrent\n" > version
     ##
-    # Have to update reshade-presets in games' directories and update any hard-installs.
+    # Have to update gshade-presets in games' directories and update any hard-installs.
     while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
       if [ -z "$gitInstall" ]; then gitInstall=1; fi
       if [ "$gitInstall" -eq 1 ]; then
-        cp -rf "reshade-presets/" "$installDir/"
+        cp -rf "gshade-presets/" "$installDir/"
       fi
       # Hard install upgrade begin.
       if [[ $(find "$installDir" -maxdepth 1 -lname "$GShadeHome/*.dll" -print) == "" ]]; then
@@ -384,7 +411,7 @@ deleteGame() {
     exit 1
   fi
   pushd "$installDir" > /dev/null
-  rm -rf 'reshade-presets' 'GShade.ini'
+  rm -rf 'gshade-presets' 'GShade.ini'
   cleanWineLinks
   popd > /dev/null
   WINEPREFIX="$tempWINEPREFIX"
@@ -394,7 +421,7 @@ deleteGame() {
 ##
 # WINEPREFIX, gameLoc, gapi, and ARCH (I use Gentoo BTW) must all have been configured elsewhere in the script.
 # This is where the magic happens, or at least where the soft links happen and a few copies and the required dll overrides.
-# This will also make an individual backup for an install's reshade-presets folder if it happens to exist, and ignore GShade.ini if it's already there.
+# This will also make an individual backup for an install's gshade-presets folder if it happens to exist, and ignore GShade.ini if it's already there.
 installGame() {
   # Get to the WINEPREFIX to make sure it's recorded as absolute and not relative.
   pushd $WINEPREFIX > /dev/null; WINEPREFIX="$(pwd)/"; popd > /dev/null
@@ -410,18 +437,18 @@ installGame() {
   wine reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v d3dcompiler_47 /d native /f >/dev/null 2>&1
   wine reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v ${gapi} /d native,builtin /f >/dev/null 2>&1
   if [ ! -f "GShade.ini" ]; then cp "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Shaders/")GShade.ini" "GShade.ini"; fi
-  ln -sfn "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Shaders" || printf "reshade-shaders")" "reshade-shaders"
-  if [ $? != 0 ] || [ ! -L "reshade-shaders" ]; then cp -a "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Shaders" || printf "reshade-shaders")" "reshade-shaders"; fi
+  ln -sfn "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Shaders" || printf "gshade-shaders")" "gshade-shaders"
+  if [ $? != 0 ] || [ ! -L "gshade-shaders" ]; then cp -a "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Shaders" || printf "gshade-shaders")" "gshade-shaders"; fi
   ln -sfn "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Shaders/")notification.wav" "notification.wav"
   if [ $? != 0 ] || [ ! -L "notification.wav" ]; then cp -a "$GShadeHome/notification.wav" "notification.wav"; fi
-  if [ -d "$gameLoc/reshade-presets" ]; then
+  if [ -d "$gameLoc/gshade-presets" ]; then
     timestamp=$(date +"%Y-%m-%d/%T")
     backupDir="$GShadeHome/Backups/$timestamp/$gameExe/"
     mkdir -p "$backupDir"
-    cp -a "reshade-presets" "$backupDir"
+    cp -a "gshade-presets" "$backupDir"
     printf "Game:\t\t$gameExe$([ ! -z "$git" ] && printf "\t -- GIT INSTALLATION")\nInstalled to:\t$gameLoc\nWINEPREFIX:\t$WINEPREFIX\n" > "$backupDir/gameInfo.txt"
   fi
-  rsync -a "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Presets/" || printf "reshade-presets")" "./$([ $git == 0 ] && printf "reshade-presets/")"
+  rsync -a "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Presets/" || printf "gshade-presets")" "./$([ $git == 0 ] && printf "gshade-presets/")"
   ln -sfn "$GShadeHome/GShade Converter.exe" "GShade Converter.exe"
   if [ $? != 0 ] || [ ! -L "GShade Converter.exe" ]; then cp -a "$GShadeHome/GShade Converter.exe" "GShade Converter.exe"; fi
   recordGame
