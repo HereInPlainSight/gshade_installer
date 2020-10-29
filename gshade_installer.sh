@@ -15,6 +15,7 @@ gameLoc=""
 gamesList=""
 gapi=""
 ARCH=""
+forceUpdate=0
 
 declare -a iniSettings=()
 
@@ -26,7 +27,7 @@ shopt -s extglob
 ##
 #Syntax options:
 #				$0					-- Guided tutorial.
-#				$0 update				-- Install / Update to latest GShade.
+#				$0 update [force]			-- Install / Update to latest GShade.  Optionally force the update.
 #				$0 list					-- List games, numbers provided are for use with remove / delete options.
 #				$0 lang <en|ja|ko|de|fr|it> [default|#]	-- Change the language of GShade's interface.  Defaults to the master copy if unspecified.
 #				$0 remove <#>				-- Remove <#> from database, leave GShade in whatever shape it's currently in.
@@ -42,7 +43,7 @@ shopt -s extglob
 #				$0 git|gitUpdate			-- Downloads / updates related git repos.  Check gitUpdate() for more info.
 ##
 printHelp() {
-  printf "Syntax options:\n\t\t\t\t$0\t\t\t\t\t\t-- Guided tutorial.\n\t\t\t\t$0 update\t\t\t\t\t-- Install / Update to latest GShade.\n\t\t\t\t$0 list\t\t\t\t\t-- List games, numbers provided are for use with remove / delete options.\n\t\t\t\t$0 lang <en|ja|ko|de|fr|it> [default|#]\t-- Change the language of GShade's interface.  Defaults to the master copy if unspecified.\n\t\t\t\t$0 remove <#>\t\t\t\t-- Remove <#> from database, leave GShade in whatever shape it's currently in.\n\t\t\t\t$0 delete <#>\t\t\t\t-- Delete GShade from <#> and remove from database.\n<WINEPREFIX=/path/to/prefix>\t$0 ffxiv\t\t\t\t\t-- Install to FFXIV in provided Wine Prefix or autodetect if no Wine Prefix.\n WINEPREFIX=/path/to/prefix\t$0 [dx(?)|opengl] /path/to/game.exe\t\t-- Install to custom location with designated graphical API version. 'dxgi' is valid here.\n\n\t\t\t\t\t\t\t\t\tNote: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!\n"
+  printf "Syntax options:\n\t\t\t\t$0\t\t\t\t\t\t-- Guided tutorial.\n\t\t\t\t$0 update [force]\t\t\t\t-- Install / Update to latest GShade.  Optionally force the update.\n\t\t\t\t$0 list\t\t\t\t\t-- List games, numbers provided are for use with remove / delete options.\n\t\t\t\t$0 lang <en|ja|ko|de|fr|it> [default|#]\t-- Change the language of GShade's interface.  Defaults to the master copy if unspecified.\n\t\t\t\t$0 remove <#>\t\t\t\t-- Remove <#> from database, leave GShade in whatever shape it's currently in.\n\t\t\t\t$0 delete <#>\t\t\t\t-- Delete GShade from <#> and remove from database.\n<WINEPREFIX=/path/to/prefix>\t$0 ffxiv\t\t\t\t\t-- Install to FFXIV in provided Wine Prefix or autodetect if no Wine Prefix.\n WINEPREFIX=/path/to/prefix\t$0 [dx(?)|opengl] /path/to/game.exe\t\t-- Install to custom location with designated graphical API version. 'dxgi' is valid here.\n\n\t\t\t\t\t\t\t\t\tNote: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!\n"
 }
 
 ##
@@ -223,8 +224,8 @@ update() {
     if ( ! command -v wine >/dev/null 2>&1 -eq 0 ); then printf "\e[31mWine not found in path -- please install wine!\e[0m\n"; fi
     if ( ! command -v md5sum >/dev/null 2>&1 -eq 0 ); then printf "\e[31mmd5sum not found in path -- please install md5sum!\e[0m\n"; fi
   fi
-  gshadeCurrent=$(wget -O- -q https://mortalitas.github.io/ffxiv/GShade/Update.txt)
-  if [[ -f "$GShadeHome/version" ]] && [[ $(<"$GShadeHome/version") == $gshadeCurrent ]]; then
+  gshadeCurrent=$(curl --silent "https://api.github.com/repos/Mortalitas/GShade/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+  if [ "$forceUpdate" -eq 0 ] && [[ -f "$GShadeHome/version" ]] && [[ $(<"$GShadeHome/version") == $gshadeCurrent ]]; then
     printf "Up to date.\n"
   else
     pushd "$GShadeHome" > /dev/null
@@ -662,6 +663,7 @@ debugInfo(){
 # Command line options:
 case $1 in
   update)
+  if [ "$2" == "force" ]; then forceUpdate=1; fi
   update
   exit 0;;
   fetchCompilers)
