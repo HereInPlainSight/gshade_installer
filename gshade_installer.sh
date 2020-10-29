@@ -262,6 +262,7 @@ update() {
     printf "Saving GShade.ini settings..."
     saveSettings
     rm -rf "GShade.Latest.zip" "gshade-shaders"
+    printf "\e[2K\rmd5sums in process..."
     old64="$(md5sum GShade64.dll | awk '{ print $1 }')"
     old32="$(md5sum GShade32.dll | awk '{ print $1 }')"
     wget -q https://github.com/Mortalitas/GShade/releases/latest/download/GShade.Latest.zip
@@ -311,6 +312,7 @@ listGames() {
   if [ ! -s $dbFile ]; then
     return 1
   fi
+  printf "Checking md5sums..."
   while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
     pushd "$installDir" > /dev/null
     gapiln=$(find -maxdepth 1 -name "*.dll" -lname "$GShadeHome/GShade*.dll" -exec basename {} ';')
@@ -330,6 +332,7 @@ listGames() {
     popd > /dev/null
     gamesList="$gamesList$((++i))) Game:\t\t$([ -f "$installDir/$gameName" ] && printf "\e[32m" || printf "\e[31m")$gameName\e[0m\t\t$([ -L "$installDir/$gapiln" ] && printf "\e[32m[$gapiln -> $([ ! -f $(readlink -f "$installDir/$gapiln") ] && printf "\e[0m\e[31m")$(basename "$(readlink -f "$installDir/$gapiln")")\e[0m\e[32m]\e[0m" || ([ -f "$installDir/$gapiln" ] && printf "\e[33m[$gapiln]\e[0m" || printf "\e[31mGShade symlink not found!\e[0m")) $([ ! -z "$gitInstall" ] && printf "\t\t\e[33m-- GIT INSTALLATION\e[0m")\n\tInstalled to:\t$([ ! -d "$installDir" ] && printf "\e[31m")${installDir/#$HOME/"\$HOME"}\e[0m\n\tWINEPREFIX:\t$([ ! -d "$prefixDir" ] && printf "\e[31m")${prefixDir/#$HOME/"\$HOME"}\e[0m\n"
   done < $dbFile
+  printf "\e[2K\r"
   return 0 
 }
 
@@ -465,7 +468,7 @@ XIVinstall() {
 
   if [ -n "$WINEPREFIX" ] && ( validPrefix ); then
     gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
-      if [ ! -d "$gameLoc" ]; then
+    if [ ! -d "$gameLoc" ]; then
       printf "\nThe WINEPREFIX was found, but the game was not.  Exiting.\n"
       exit 1
     fi
@@ -643,11 +646,12 @@ debugInfo(){
     exit 1
   fi
   pushd "$GShadeHome" > /dev/null
+  printf "Checking md5sums..."
   md5sum --status --ignore-missing -c <<<"c971cde5194dd761456214dd5365bdc7 d3dcompiler_47s/d3dcompiler_47.dll.32bit"
   PS=$?
   md5sum --status --ignore-missing -c <<<"b0ae3aa9dd1ebd60bdf51cb94834cd04 d3dcompiler_47s/d3dcompiler_47.dll.64bit"
   N64=$?
-  output=$(printf "Installation location:\t${GShadeHome/#$HOME/"\$HOME"}/\nInstallation version:\t$(cat $GShadeHome/version)\nd3dcompiler_47 32-bit:\t$([ $PS -eq 0 ] && printf "\e[32mOK" || printf "\e[31mmd5sum failure")\e[0m\nd3dcompiler_47 64-bit:\t$([ $N64 -eq 0 ] && printf "\e[32mOK" || printf "\e[31mmd5sum failure")\e[0m\nWine version:\t\t$($( command -v wine >/dev/null 2>&1 -eq 0 ) && printf "\e[32m$(wine --version)\e[0m" || printf "\e[31mNot installed\e0m")")
+  output=$(printf "\e[2K\rInstallation location:\t${GShadeHome/#$HOME/"\$HOME"}/\nInstallation version:\t$(cat $GShadeHome/version)\nd3dcompiler_47 32-bit:\t$([ $PS -eq 0 ] && printf "\e[32mOK" || printf "\e[31mmd5sum failure")\e[0m\nd3dcompiler_47 64-bit:\t$([ $N64 -eq 0 ] && printf "\e[32mOK" || printf "\e[31mmd5sum failure")\e[0m\nWine version:\t\t$($( command -v wine >/dev/null 2>&1 -eq 0 ) && printf "\e[32m$(wine --version)\e[0m" || printf "\e[31mNot installed\e0m")")
   listGames; [ $? ] && output+=$(printf "\ngames.db:\n${gamesList/#$HOME/"\$HOME"}") || output+=$(printf "\ngames.db:\tEmpty or does not currently exist.")
   popd > /dev/null
   if [ "$1" != "upload" ]; then

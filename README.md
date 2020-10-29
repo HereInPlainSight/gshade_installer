@@ -10,7 +10,7 @@ If you would prefer to run the commands directly, the help menu should give you 
 ```
 Syntax options:
                                 ./gshade_installer.sh                                           -- Guided tutorial
-                                ./gshade_installer.sh update                                    -- Install / Update to latest GShade
+                                ./gshade_installer.sh update [force]                            -- Install / Update to latest GShade.  Optionally force the update.
                                 ./gshade_installer.sh list                                      -- List games, numbers provided are for use with remove / delete options.
                                 ./gshade_installer.sh lang <en|ja|ko|de|fr|it> [default|#]      -- Change the language of GShade's interface.  Defaults to the master copy if unspecified.
                                 ./gshade_installer.sh remove <#>                                -- Remove <#> from database, leave GShade in whatever shape it's currently in.
