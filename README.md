@@ -4,7 +4,7 @@ This is a CLI [GShade](https://gposers.com/gshade/) installer for Linux.  It bot
 
 ## Getting Started
 
-Download the script and run it.  There is a basic menu.
+Once you've got the script and it's executable, you can simply run it.  There is a basic menu.
 
 If you would prefer to run the commands directly, the help menu should give you the basics (`./gshade_installer.sh --help`):
 ```
@@ -20,16 +20,20 @@ Syntax options:
 
                                                                         Note: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!
 ```
-You can also just clone the repo and run the script from within it.
+You can clone the repo and run the script from within it.  Instructions to do so are below the prerequisites.
 
 ### Prerequisites
 
 To my knowledge this should work in virtually any Linux install that has access to bash and basic utilities.  `wget`, `ln`, `find`, `awk`, `sed`, `unzip`.  You need a local copy of WINE installed -- the version itself doesn't matter, but if you'll be using your local copy of WINE to ***play*** the game, you'll need 4.2 or above to get shaders to work.
 
-### Installing
+### Installation
 
-Assuming you clone the repo (`git clone https://github.com/HereInPlainSight/gshade_installer.git`) and change directory into it:
-`./gshade_installer.sh update` will prompt you to install.  We install to `$XDG_DATA_HOME/GShade/`, which defaults to `$HOME/.local/share/GShade/`.
+There's multiple ways to run the installer, this is just one method.
+  1) Clone the repo:  `git clone https://github.com/HereInPlainSight/gshade_installer.git`
+  2) Change directory into it:  `cd gshade_installer`
+  3) Run the script:  `./gshade_installer.sh`
+
+We install to the `$XDG_DATA_HOME/GShade/` directory, which defaults to `$HOME/.local/share/GShade/`.
 
 #### ***If any of the following seems complicated -- just run `./gshade_installer.sh` and follow the guided prompts.***
 
