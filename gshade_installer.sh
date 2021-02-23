@@ -132,12 +132,16 @@ fetchCompilers() {
     fi
     pushd "$GShadeHome/d3dcompiler_47s" > /dev/null
     printf "\e[2K\rDownloading 64-bit compiler...  "
+    ##
+    # Sourced from Lutris.  I don't even remember how I found this was sitting there.
     wget -q https://lutris.net/files/tools/dll/d3dcompiler_47.dll
     mv d3dcompiler_47.dll d3dcompiler_47.dll.64bit
     printf "Done!"
-    # This following was sourced from The_Riesi @ https://www.reddit.com/r/linux_gaming/comments/b2hi3g/reshade_working_in_wine_43/
+    # The following was originally sourced from The_Riesi @ https://www.reddit.com/r/linux_gaming/comments/b2hi3g/reshade_working_in_wine_43/, but the link is now dead.
+    # Utilizing the same method winetricks uses.
     printf "\e[2K\rDownloading 32-bit compiler...  "
-    wget -q http://dege.freeweb.hu/dgVoodoo2/D3DCompiler_47.zip && unzip -q D3DCompiler_47.zip && rm D3DCompiler_47.zip
+##    wget -q http://dege.freeweb.hu/dgVoodoo2/D3DCompiler_47.zip && unzip -q D3DCompiler_47.zip && rm D3DCompiler_47.zip
+    wget -qq https://download-installer.cdn.mozilla.net/pub/firefox/releases/62.0.3/win32/ach/Firefox%20Setup%2062.0.3.exe && 7z e -y "Firefox Setup 62.0.3.exe" "core/d3dcompiler_47.dll" >> /dev/null && rm "Firefox Setup 62.0.3.exe"
     mv d3dcompiler_47.dll d3dcompiler_47.dll.32bit
     printf "Done!"
     popd > /dev/null
@@ -266,10 +270,13 @@ presetUpdate() {
 update() {
   if [ ! -d "$GShadeHome" ]; then
     if (yesNo "GShade initial install not found, would you like to create it?  "); then printf "\nCreating...  "; else printf "\nAborting installation.\n"; exit 1; fi
-    mkdir -p "$GShadeHome/gshade-presets/" && pushd "$GShadeHome" > /dev/null && touch games.db && wget -q https://mortalitas.github.io/ffxiv/GShade/GShade%20Converter.exe && popd > /dev/null
-    fetchCompilers
+    mkdir -p "$GShadeHome/gshade-presets/" && pushd "$GShadeHome" > /dev/null && touch games.db && popd > /dev/null
+    ## Legacy wget.  RIP GShade Converter.exe.
+    # wget -q https://mortalitas.github.io/ffxiv/GShade/GShade%20Converter.exe && popd > /dev/null
+    if ( ! command -v 7z >/dev/null 2&1 -eq 0 ); then printf "\e[31m7z not found in path -- please install p7zip and re-fetch compilers!\e[0m\n"; fi
     if ( ! command -v wine >/dev/null 2>&1 -eq 0 ); then printf "\e[31mWine not found in path -- please install wine!\e[0m\n"; fi
     if ( ! command -v md5sum >/dev/null 2>&1 -eq 0 ); then printf "\e[31mmd5sum not found in path -- please install md5sum!\e[0m\n"; fi
+    fetchCompilers
   fi
   gshadeCurrent=$(curl --silent "https://api.github.com/repos/Mortalitas/GShade/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
   if [ "$forceUpdate" -eq 0 ] && [[ -f "$GShadeHome/version" ]] && [[ $(<"$GShadeHome/version") == $gshadeCurrent ]]; then
@@ -458,8 +465,10 @@ installGame() {
     printf "Game:\t\t$gameExe$([ ! -z "$git" ] && printf "\t -- GIT INSTALLATION")\nInstalled to:\t$gameLoc\nWINEPREFIX:\t$WINEPREFIX\n" > "$backupDir/gameInfo.txt"
   fi
   rsync -a "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Presets/" || printf "gshade-presets")" "./$([ $git == 0 ] && printf "gshade-presets/")"
-  ln -sfn "$GShadeHome/GShade Converter.exe" "GShade Converter.exe"
-  if [ $? != 0 ] || [ ! -L "GShade Converter.exe" ]; then cp -a "$GShadeHome/GShade Converter.exe" "GShade Converter.exe"; fi
+##
+# GShade Converter.exe is no longer supported by GShade, thus no longer supported in this script.
+#  ln -sfn "$GShadeHome/GShade Converter.exe" "GShade Converter.exe"
+#  if [ $? != 0 ] || [ ! -L "GShade Converter.exe" ]; then cp -a "$GShadeHome/GShade Converter.exe" "GShade Converter.exe"; fi
   recordGame
   popd > /dev/null
 }
@@ -666,11 +675,19 @@ debugInfo(){
   fi
   pushd "$GShadeHome" > /dev/null
   printf "Checking md5sums..."
-  md5sum --status --ignore-missing -c <<<"c971cde5194dd761456214dd5365bdc7 d3dcompiler_47s/d3dcompiler_47.dll.32bit"
-  PS=$?
+  md3d32=$(md5sum "d3dcompiler_47s/d3dcompiler_47.dll.32bit")
+  ##
+  # Alert if legacy md5sum.  This is my own fault and may just get changed back to the new md5sum at some point.
+  if [ "$md3d32" == "eee83660394f290e3ea5faac41c23a70  d3dcompiler_47s/d3dcompiler_47.dll.32bit" ]; then
+    PS=0
+  elif [ "$md3d32" == "c971cde5194dd761456214dd5365bdc7  d3dcompiler_47s/d3dcompiler_47.dll.32bit" ]; then
+    PS=2
+  else
+    PS=1
+  fi
   md5sum --status --ignore-missing -c <<<"b0ae3aa9dd1ebd60bdf51cb94834cd04 d3dcompiler_47s/d3dcompiler_47.dll.64bit"
   N64=$?
-  output=$(printf "\e[2K\rInstallation location:\t${GShadeHome/#$HOME/"\$HOME"}/\nInstallation version:\t$(cat $GShadeHome/version)\nd3dcompiler_47 32-bit:\t$([ $PS -eq 0 ] && printf "\e[32mOK" || printf "\e[31mmd5sum failure")\e[0m\nd3dcompiler_47 64-bit:\t$([ $N64 -eq 0 ] && printf "\e[32mOK" || printf "\e[31mmd5sum failure")\e[0m\nWine version:\t\t$($( command -v wine >/dev/null 2>&1 -eq 0 ) && printf "\e[32m$(wine --version)\e[0m" || printf "\e[31mNot installed\e0m")")
+  output=$(printf "\e[2K\rInstallation location:\t${GShadeHome/#$HOME/"\$HOME"}/\nInstallation version:\t$(cat $GShadeHome/version)\nd3dcompiler_47 32-bit:\t$([ $PS -eq 0 ] && printf "\e[32mOK" || printf "\e[31mmd5sum failure")\e[0m$([ $PS -eq 2 ] && printf " \e[33mLegacy file -- please run \'$0 fetchCompilers\'!\e[0m")\nd3dcompiler_47 64-bit:\t$([ $N64 -eq 0 ] && printf "\e[32mOK" || printf "\e[31mmd5sum failure")\e[0m\nWine version:\t\t$($( command -v wine >/dev/null 2>&1 -eq 0 ) && printf "\e[32m$(wine --version)\e[0m" || printf "\e[31mNot installed\e0m")")
   listGames; [ $? ] && output+=$(printf "\ngames.db:\n${gamesList/#$HOME/"\$HOME"}") || output+=$(printf "\ngames.db:\tEmpty or does not currently exist.")
   popd > /dev/null
   if [ "$1" != "upload" ]; then

@@ -26,6 +26,8 @@ You can clone the repo and run the script from within it.  Instructions to do so
 
 To my knowledge this should work in virtually any Linux install that has access to bash and basic utilities.  `wget`, `ln`, `find`, `awk`, `sed`, `unzip`.  You need a local copy of WINE installed -- the version itself doesn't matter, but if you'll be using your local copy of WINE to ***play*** the game, you'll need 4.2 or above to get shaders to work.
 
+As of 02-23-21, p7zip is also required.  If you have a reliable source of the required 32-bit d3dcompiler that doesn't need it, I'm open to removing the requirement, but right now we're using the winetricks method.
+
 ### Installation
 
 There's multiple ways to run the installer, this is just one method.
