@@ -1,5 +1,11 @@
 #!/bin/bash
 
+###
+# TODO:
+# Mac compatibility (low priority until proven working)
+# - Replace cp with rsync
+#
+
 ##
 # Housekeeping to respect user's configurations.
 if [ -z "$XDG_CONFIG_HOME" ]; then XDG_CONFIG_HOME="$HOME/.config"; fi
@@ -440,7 +446,7 @@ deleteGame() {
 # This will also make an individual backup for an install's gshade-presets folder if it happens to exist, and ignore GShade.ini if it's already there.
 installGame() {
   # Get to the WINEPREFIX to make sure it's recorded as absolute and not relative.
-  pushd $WINEPREFIX > /dev/null; WINEPREFIX="$(pwd)/"; popd > /dev/null
+  pushd "$WINEPREFIX" > /dev/null; WINEPREFIX="$(pwd)/"; popd > /dev/null
 #  WINEPREFIX="${WINEPREFIX//+(\/)//}"		# Legacy, but interesting to remember.
   pushd "$gameLoc" > /dev/null
   # Clean up an old install before the new soft links and reg edits are re-added.  Mostly to deal with changing gapi's.
@@ -687,7 +693,7 @@ debugInfo(){
   fi
   md5sum --status --ignore-missing -c <<<"b0ae3aa9dd1ebd60bdf51cb94834cd04 d3dcompiler_47s/d3dcompiler_47.dll.64bit"
   N64=$?
-  output=$(printf "\e[2K\rInstallation location:\t${GShadeHome/#$HOME/"\$HOME"}/\nInstallation version:\t$(cat $GShadeHome/version)\nd3dcompiler_47 32-bit:\t$([ $PS -eq 0 ] && printf "\e[32mOK" || printf "\e[31mmd5sum failure")\e[0m$([ $PS -eq 2 ] && printf " \e[33mLegacy file -- please run \'$0 fetchCompilers\'!\e[0m")\nd3dcompiler_47 64-bit:\t$([ $N64 -eq 0 ] && printf "\e[32mOK" || printf "\e[31mmd5sum failure")\e[0m\nWine version:\t\t$($( command -v wine >/dev/null 2>&1 -eq 0 ) && printf "\e[32m$(wine --version)\e[0m" || printf "\e[31mNot installed\e0m")")
+  output=$(printf "\e[2K\rInstallation location:\t${GShadeHome/#$HOME/"\$HOME"}/\nInstallation version:\t$(cat $GShadeHome/version)\nd3dcompiler_47 32-bit:\t$([ $PS -eq 0 ] && printf "\e[32mOK" || printf "\e[31mmd5sum failure")\e[0m$([ $PS -eq 2 ] && printf " \e[33mLegacy file -- please run \'$0 fetchCompilers\'!\e[0m")\nd3dcompiler_47 64-bit:\t$([ $N64 -eq 0 ] && printf "\e[32mOK" || printf "\e[31mmd5sum failure")\e[0m\nWine version:\t\t$($( command -v wine >/dev/null 2>&1 -eq 0 ) && printf "\e[32m$(wine --version)\e[0m" || printf "\e[31mNot installed\e[0m")")
   listGames; [ $? ] && output+=$(printf "\ngames.db:\n${gamesList/#$HOME/"\$HOME"}") || output+=$(printf "\ngames.db:\tEmpty or does not currently exist.")
   popd > /dev/null
   if [ "$1" != "upload" ]; then
@@ -708,7 +714,7 @@ case $1 in
         presetUpdate
 	exit 0;;
       force)
-        forceUpdate=1
+        forceUpdate=1;;
     esac
     update
   exit 0;;
