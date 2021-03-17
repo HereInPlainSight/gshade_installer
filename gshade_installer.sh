@@ -88,7 +88,7 @@ performBackup() {
   printf "Performing backup..."
   while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
     backupDir="$GShadeHome/Backups/$timestamp/$gameName"
-    [ ! -d "$backupDir" ] && mkdir "$backupDir" || backupDir=$(mktemp -d -t "$gameName-XXXXXXXXXX" --tmpdir=./)
+    [ ! -d "$backupDir" ] && mkdir "$backupDir" || backupDir=$(mktemp -d -p "$gameName-XXXXXXXXXX" --tmpdir=./)
     printf "Game:\t\t$gameName$([ ! -z "$gitInstall" ] && printf "\t -- GIT INSTALLATION")\nInstalled to:\t$installDir\nWINEPREFIX:\t$prefixDir\n" > "$backupDir/gameInfo.txt"
     cp "$installDir/GShade.ini" "$backupDir/"
     cp -r "$installDir/gshade-presets" "$backupDir/"
@@ -119,7 +119,7 @@ gitUpdate() {
         if ( $gitInstall -eq 0 ); then
           if ( $backups -eq 0 ); then
             gameBackupDir="$backupDir/$gameName"
-            [ ! -d "$gameBackupDir" ] && mkdir "$gameBackupDir" || gameBackupDir=$(mktemp -d -t "$gameName-XXXXXXXXXX" --tmpdir=./)
+            [ ! -d "$gameBackupDir" ] && mkdir "$gameBackupDir" || gameBackupDir=$(mktemp -d -p "$gameName-XXXXXXXXXX" --tmpdir=./)
             printf "Game:\t\t$gameName\t -- GIT INSTALLATION\nInstalled to:\t$installDir\nWINEPREFIX:\t$prefixDir\n" > "$backupDir/gameInfo.txt"
             cp "$installDir/GShade.ini" "$gameBackupDir/"
             rsync -a "$installDir/gshade-presets/" "$gameBackupDir/"
