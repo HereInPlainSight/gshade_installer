@@ -497,7 +497,7 @@ XIVinstall() {
 
   ##
   # This will be relevant if it exists.
-  lutrisYaml=$(find "$XDG_CONFIG_HOME"/lutris/games/ -name 'final-fantasy-xiv*' 2>/dev/null)  ## TODO: Fix for multiple Lutris installs.
+  readarray -d '' lutrisYaml < <(find "$XDG_CONFIG_HOME"/lutris/games/ -name 'final-fantasy-xiv*' -print0 2>/dev/null)
 
   if [ -n "$WINEPREFIX" ] && ( validPrefix ); then
     gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
@@ -512,15 +512,19 @@ XIVinstall() {
       printf "Complete!\n"
     fi
   fi
+
   if [[ -n "$lutrisYaml" ]] && [ -f "$lutrisYaml" ]; then
-    WINEPREFIX="$(awk -F': ' '/prefix/{print $2}' "${lutrisYaml}")"
-    gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
-    printf "\nLutris install found!\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
-    if (yesNo "Install? "); then
-      printf "\nInstalling...  "
-      installGame
-      printf "Complete!\n"
-    fi
+    if [ ${#lutrisYaml[@]} -gt 1 ]; then printf "\nFound %s Lutris installs!" "${#lutrisYaml[@]}"; else printf "\nLutris install found!"; fi
+    for i in ${lutrisYaml[@]}; do
+      WINEPREFIX="$(awk -F': ' '/prefix/{print $2}' "$i")"
+      gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
+      printf "\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
+      if (yesNo "Install? "); then
+        printf "\nInstalling...  "
+        installGame
+        printf "Complete!\n"
+      fi
+    done
   fi
   if [ -d "$HOME/.steam/steam/steamapps/common/FINAL FANTASY XIV Online/game/" ] && [ -d "$HOME/.steam/steam/steamapps/compatdata/39210/pfx" ]; then
     WINEPREFIX="$HOME/.steam/steam/steamapps/compatdata/39210/pfx"
