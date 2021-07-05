@@ -279,7 +279,7 @@ update() {
     mkdir -p "$GShadeHome/gshade-presets/" && pushd "$GShadeHome" > /dev/null && touch games.db && popd > /dev/null || exit
     ## Legacy wget.  RIP GShade Converter.exe.
     # wget -q https://mortalitas.github.io/ffxiv/GShade/GShade%20Converter.exe && popd > /dev/null
-    if ( ! command -v 7z >/dev/null 2&1 -eq 0 ); then printf "\e[31m7z not found in path -- please install p7zip and re-fetch compilers!\e[0m\n"; fi
+    if ( ! command -v 7z >/dev/null 2>&1 -eq 0 ); then printf "\e[31m7z not found in path -- please install p7zip and re-fetch compilers!\e[0m\n"; fi
     if ( ! command -v wine >/dev/null 2>&1 -eq 0 ); then printf "\e[31mWine not found in path -- please install wine!\e[0m\n"; fi
     if ( ! command -v md5sum >/dev/null 2>&1 -eq 0 ); then printf "\e[31mmd5sum not found in path -- please install md5sum!\e[0m\n"; fi
     fetchCompilers
@@ -314,12 +314,16 @@ update() {
       fi
     fi
     presetUpdate
-    printf "Saving GShade.ini settings..."
-    saveSettings
+    if [[ -f "$GShadeHome/GShade.ini" ]]; then
+      printf "Saving GShade.ini settings..."
+      saveSettings
+    fi
     rm -rf "GShade.Latest.zip" "gshade-shaders"
-    printf "\e[2K\rmd5sums in process..."
-    old64="$(md5sum GShade64.dll | awk '{ print $1 }')"
-    old32="$(md5sum GShade32.dll | awk '{ print $1 }')"
+    if [[ -f "$GShadeHome/GShade64.dll" ]]; then
+      printf "\e[2K\rmd5sums in process..."
+      old64="$(md5sum GShade64.dll | awk '{ print $1 }')"
+      old32="$(md5sum GShade32.dll | awk '{ print $1 }')"
+    fi
     wget -q https://github.com/Mortalitas/GShade/releases/latest/download/GShade.Latest.zip
     unzip -qquo GShade.Latest.zip
     printf "\e[2K\rRestoring any applicable GShade.ini settings...  "
@@ -407,7 +411,7 @@ cleanWineLinks() {
   if ( validPrefix ); then
     export WINEPREFIX
     wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v d3dcompiler_47 /f > /dev/null 2>&1
-    oldGapi="$(basename "$(find "$GShadeHome/GShade*.dll" -maxdepth 1 -lname -exec basename {} ';')" .dll)"
+    oldGapi="$(basename "$(find -maxdepth 1 -lname "$GShadeHome/GShade*.dll" -exec basename {} ';')" .dll)"
     wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${oldGapi}" /f > /dev/null 2>&1
   fi
   find "$GShadeHome/*" -maxdepth 1 -lname -delete > /dev/null 2>&1 #"$GShadeHome/*" -delete
