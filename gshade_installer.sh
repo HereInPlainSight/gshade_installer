@@ -264,7 +264,8 @@ presetUpdate() {
   if [ -f "version" ]; then performBackup "$timestamp"; [ -d "$GShadeHome/git" ] && gitUpdate "$timestamp"; fi
   printf "Updating presets..."
   wget -q https://github.com/Mortalitas/GShade-Presets/archive/master.zip
-  unzip -qquo master.zip && rm -r master.zip gshade-presets && mv "GShade-Presets-master" "gshade-presets"
+  unzip -qquo master.zip && rm -r master.zip gshade-presets
+  mv "GShade-Presets-master" "gshade-presets"
   updateInstalls presets
   popd > /dev/null || exit
   printf "\e[2K\r                   \r"
