@@ -277,12 +277,18 @@ presetUpdate() {
 update() {
   if [ ! -d "$GShadeHome" ]; then
     if (yesNo "GShade initial install not found, would you like to create it?  "); then printf "\nCreating...  "; else printf "\nAborting installation.\n"; exit 1; fi
+    prereqs=(7z awk find ln md5sum unzip wget wine)
+    mia=""
+    for i in "${prereqs[@]}"; do
+      if ( ! hash "$i" &>/dev/null );
+        then if [ -n "$mia" ]; then mia+=", $i"; else mia="$i"; fi
+      fi
+    done
+    if [ -n "$mia" ]; then
+      printf "The following necessary command(s) could not be found: %s\n", "$mia"
+      exit 1
+    fi
     mkdir -p "$GShadeHome/gshade-presets/" && pushd "$GShadeHome" > /dev/null && touch games.db && popd > /dev/null || exit
-    ## Legacy wget.  RIP GShade Converter.exe.
-    # wget -q https://mortalitas.github.io/ffxiv/GShade/GShade%20Converter.exe && popd > /dev/null
-    if ( ! command -v 7z >/dev/null 2>&1 -eq 0 ); then printf "\e[31m7z not found in path -- please install p7zip and re-fetch compilers!\e[0m\n"; fi
-    if ( ! command -v wine >/dev/null 2>&1 -eq 0 ); then printf "\e[31mWine not found in path -- please install wine!\e[0m\n"; fi
-    if ( ! command -v md5sum >/dev/null 2>&1 -eq 0 ); then printf "\e[31mmd5sum not found in path -- please install md5sum!\e[0m\n"; fi
     fetchCompilers
   fi
   gshadeCurrent=$(curl --silent "https://api.github.com/repos/Mortalitas/GShade/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
@@ -325,6 +331,7 @@ update() {
       old64="$(md5sum GShade64.dll | awk '{ print $1 }')"
       old32="$(md5sum GShade32.dll | awk '{ print $1 }')"
     fi
+    printf "\e[2K\rDownloading latest GShade...                     "
     wget -q https://github.com/Mortalitas/GShade/releases/latest/download/GShade.Latest.zip
     unzip -qquo GShade.Latest.zip
     printf "\e[2K\rRestoring any applicable GShade.ini settings...  "
