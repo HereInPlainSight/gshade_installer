@@ -62,3 +62,7 @@ If you need help, please check the [GPoser's discord](https://discord.gg/gposers
 
 * Thanks to Marot on the GPosers discord for -- absolutely everything they do.
 
+## Contributors
+
+* JacoG-RH - Non-standard Steam libraries.
+

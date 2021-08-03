@@ -277,7 +277,7 @@ presetUpdate() {
 update() {
   if [ ! -d "$GShadeHome" ]; then
     if (yesNo "GShade initial install not found, would you like to create it?  "); then printf "\nCreating...  "; else printf "\nAborting installation.\n"; exit 1; fi
-    prereqs=(7z awk find ln md5sum unzip wget wine)
+    prereqs=(7z awk find ln md5sum sed unzip wget wine)
     mia=""
     for i in "${prereqs[@]}"; do
       if ( ! hash "$i" &>/dev/null );
@@ -538,9 +538,17 @@ XIVinstall() {
       fi
     done
   fi
-  if [ -d "$HOME/.steam/steam/steamapps/common/FINAL FANTASY XIV Online/game/" ] && [ -d "$HOME/.steam/steam/steamapps/compatdata/39210/pfx" ]; then
-    WINEPREFIX="$HOME/.steam/steam/steamapps/compatdata/39210/pfx"
-    gameLoc="$HOME/.steam/steam/steamapps/common/FINAL FANTASY XIV Online/game/"
+
+  ## Non-standard Steam locations contributed by JacoG-RH
+  readarray -t steamDirs < <(cat ~/.steam/steam/steamapps/libraryfolders.vdf | grep "path" | awk '{ print $2  }' | sed s/\"//g)
+  steamDirs=("${steamDirs[@]}" "$HOME/.steam/steam")
+  for checkDir in "${steamDirs[@]}"; do
+    if [ -d "${checkDir}/steamapps/compatdata/39210/pfx" ]; then ffxivDir="${checkDir}"; fi
+  done
+
+  if [ -d "${ffxivDir}/steamapps/common/FINAL FANTASY XIV Online/game/" ] && [ -d "${ffxivDir}/steamapps/compatdata/39210/pfx" ]; then
+    WINEPREFIX="${ffxivDir}/steamapps/compatdata/39210/pfx"
+    gameLoc="${ffxivDir}/steamapps/common/FINAL FANTASY XIV Online/game/"
     printf "\nSteam install found!\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
     if (yesNo "Install? "); then
         if ( ! yesNo "Use $gapi instead of dxgi?  If you are having issues with GShade when using other overlays (Steam or Discord, for instance), you may wish to try dxgi mode instead." ); then gapi=dxgi; fi
