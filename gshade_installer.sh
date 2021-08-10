@@ -557,6 +557,28 @@ XIVinstall() {
       printf "Complete!\n"
     fi
   fi
+
+  ## Wine Steam
+  if wine --version 2>&1 > /dev/null; then
+    steamLoc="$(wine reg query "HKLM\\Software\\Valve\\Steam" /v InstallPath 2>/dev/null | grep InstallPath | sed -E 's/^\s+InstallPath\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
+    gameLoc="$(winepath "$steamLoc" 2>/dev/null | tr -d '\r\n')/steamapps/common/FINAL FANTASY XIV Online/game/"
+    
+    if [ -d "$gameLoc" ]; then
+      if [ -z "$WINEPREFIX" ]; then
+        WINEPREFIX="$HOME/.wine"
+      fi
+
+      printf "\nWine Steam install found!\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
+
+      if (yesNo "Install? "); then
+        if ( ! yesNo "Use $gapi instead of dxgi?  If you are having issues with GShade when using other overlays (Steam or Discord, for instance), you may wish to try dxgi mode instead." ); then gapi=dxgi; fi
+        printf "\nInstalling...  "
+        installGame
+        printf "Complete!\n"
+      fi
+    fi
+  fi
+
   printf "\nScan complete.\n"
 }
 
