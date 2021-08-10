@@ -511,17 +511,38 @@ XIVinstall() {
   # This will be relevant if it exists.
   readarray -d '' lutrisYaml < <(find "$XDG_CONFIG_HOME"/lutris/games/ -name 'final-fantasy-xiv*' -print0 2>/dev/null)
 
+  wineprefixSetManually=0
+
   if [ -n "$WINEPREFIX" ] && ( validPrefix ); then
+    wineprefixSetManually=1
+  else
+    WINEPREFIX="$HOME/.wine"
+  fi
+
+  if ( validPrefix ); then
     gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
+
     if [ ! -d "$gameLoc" ]; then
-      printf "\nThe WINEPREFIX was found, but the game was not.  Exiting.\n"
-      exit 1
+      # Try to read game location from registry
+      squareEnixLoc="$(wine reg query 'HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Uninstall\{2B41E132-07DF-4925-A3D3-F2D1765CCDFE}' /v InstallLocation 2>/dev/null | grep InstallLocation | sed -E 's/^\s+InstallLocation\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
+
+      if [ -n "$squareEnixLoc" ]; then
+        gameLoc="$(winepath -u "$squareEnixLoc\\FINAL FANTASY XIV - A Realm Reborn\\game\\" 2>/dev/null | tr -d '\r\n')"
+      fi
     fi
-    printf "\nWine install found!\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
-    if (yesNo "Install? "); then
-      printf "\nInstalling...  ";
-      installGame
-      printf "Complete!\n"
+
+    if [ ! -d "$gameLoc" ]; then
+      if [ $wineprefixSetManually == 1 ]; then
+        printf "\nThe WINEPREFIX was found, but the game was not.  Exiting.\n"
+        exit 1
+      fi
+    else
+      printf "\nWine install found!\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
+      if (yesNo "Install? "); then
+        printf "\nInstalling...  ";
+        installGame
+        printf "Complete!\n"
+      fi
     fi
   fi
 
