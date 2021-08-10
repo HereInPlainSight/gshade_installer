@@ -65,4 +65,5 @@ If you need help, please check the [GPoser's discord](https://discord.gg/gposers
 ## Contributors
 
 * JacoG-RH - Non-standard Steam libraries.
+* Maia-Everett - Support for Wine Steam, locating game via wine registry, and $HOME/.wine checking.
 
