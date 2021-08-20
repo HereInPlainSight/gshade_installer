@@ -516,6 +516,7 @@ XIVinstall() {
   if ( validPrefix ); then
     gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
 
+    ## Querying location from registry, ~/.wine checking, and Wine Steam install are all contributed by Maia-Everett.
     if [ ! -d "$gameLoc" ]; then
       # Try to read game location from registry
       squareEnixLoc="$(wine reg query 'HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Uninstall\{2B41E132-07DF-4925-A3D3-F2D1765CCDFE}' /v InstallLocation 2>/dev/null | grep InstallLocation | sed -E 's/^\s+InstallLocation\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
@@ -540,6 +541,7 @@ XIVinstall() {
     else
       printf "\nWine install found!\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
       if (yesNo "Install? "); then
+        if ( ! yesNo "Use $gapi instead of dxgi?  If you are having issues with GShade when using other overlays (Steam or Discord, for instance), you may wish to try dxgi mode instead." ); then gapi=dxgi; fi
         printf "\nInstalling...  ";
         installGame
         printf "Complete!\n"
