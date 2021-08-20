@@ -422,7 +422,7 @@ cleanWineLinks() {
     oldGapi="$(basename "$(find -maxdepth 1 -lname "$GShadeHome/GShade*.dll" -exec basename {} ';')" .dll)"
     wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${oldGapi}" /f > /dev/null 2>&1
   fi
-  find "$GShadeHome/*" -maxdepth 1 -lname -delete > /dev/null 2>&1 #"$GShadeHome/*" -delete
+  find "$gameLoc" -maxdepth 1 -lname "$GShadeHome/*" -delete > /dev/null 2>&1
 }
 
 ##
@@ -439,12 +439,12 @@ removeGame() {
 deleteGame() {
   performBackup
   tempWINEPREFIX="$WINEPREFIX"
-  IFS="=;" read -r gameName installDir WINEPREFIX gitInstall <<< "$(sed "${1}q;d" "$dbFile")"
-  if [ ! -d "$installDir" ]; then
+  IFS="=;" read -r gameName gameLoc WINEPREFIX gitInstall <<< "$(sed "${1}q;d" "$dbFile")"
+  if [ ! -d "$gameLoc" ]; then
     printf "Installation directory not found -- nothing to delete.  Removal recommended instead.  Exiting.\n"
     exit 1
   fi
-  pushd "$installDir" > /dev/null || exit
+  pushd "$gameLoc" > /dev/null || exit
   rm -rf 'gshade-presets' 'GShade.ini'
   cleanWineLinks
   popd > /dev/null || exit
@@ -740,7 +740,7 @@ debugInfo(){
   fi
   md5sum --status --ignore-missing -c <<<"b0ae3aa9dd1ebd60bdf51cb94834cd04 d3dcompiler_47s/d3dcompiler_47.dll.64bit"
   N64=$?
-  output=$(printf "%b" "\e[2K\rInstallation location:\t${GShadeHome/#$HOME/"\$HOME"}/\nInstallation version:\t$(cat "$GShadeHome"/version)\nd3dcompiler_47 32-bit:\t$([ "$PS" -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")\e[0m$([ "$PS" -eq 2 ] && printf "%b" " \e[33mLegacy file -- please run \'$0 fetchCompilers\'!\e[0m")\nd3dcompiler_47 64-bit:\t$([ $N64 -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")\e[0m\nWine version:\t\t$($( command -v wine >/dev/null 2>&1 -eq 0 ) && printf "%b" "\e[32m$(wine --version)\e[0m" || printf "\e[31mNot installed\e[0m")")
+  output=$(printf "%b" "\e[2K\rInstallation location:\t${GShadeHome/#$HOME/"\$HOME"}/\nInstallation version:\t$(cat "$GShadeHome"/version)\nd3dcompiler_47 32-bit:\t$([ "$PS" -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")\e[0m$([ "$PS" -eq 2 ] && printf "%b" " \e[33mLegacy file -- please run '$0 fetchCompilers'!\e[0m")\nd3dcompiler_47 64-bit:\t$([ $N64 -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")\e[0m\nWine version:\t\t$($( command -v wine >/dev/null 2>&1 -eq 0 ) && printf "%b" "\e[32m$(wine --version)\e[0m" || printf "\e[31mNot installed\e[0m")")
   listGames; [ $? ] && output+=$(printf "\ngames.db:\n%b" "${gamesList/#$HOME/"\$HOME"}") || output+=$(printf "\ngames.db:\tEmpty or does not currently exist.")
   popd > /dev/null || exit
   if [ "$1" != "upload" ]; then
