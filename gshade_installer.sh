@@ -300,7 +300,7 @@ update() {
     # The Great 3.0 Update:
     # Rename the reshade-presets directory to gshade-presets everywhere.
     # Rename gshade-shaders in $GShadeHome the same way and relink everywhere.  Unless it's a hard install -- then rename everywhere.
-    if [[ -f "$GShadeHome/version" ]] && [[ $(<"$GShadeHome/version") -lt 3 ]]; then
+    if [[ -f "$GShadeHome/version" ]] && (( $(echo "$(sed s/v//g "$GShadeHome/version")" | awk '{print ($1 < 3)}') )); then
       mv "reshade-presets" "gshade-presets"
       mv "reshade-shaders" "gshade-shaders"
       listGames;
