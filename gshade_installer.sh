@@ -351,10 +351,22 @@ update() {
 # 	WINEPREFIX:	<Location of wine's prefix installed to.>
 listGames() {
   gamesList=""			# Always blank the list in case user is confirming removal after checking before.
-  i=0				# Yeah, iterating for removal / deletion numbering options.
+  i=1				# Yeah, iterating for removal / deletion numbering options.
   if [ ! -s "$dbFile" ]; then
     return 1
   fi
+  # First, check that all these paths actually exist, and remove ones that don't.
+  while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
+    if [ ! -d "$installDir" ]; then
+      removeGame $i
+      printf "Game installation \"%s\" not found, removed from list.\n" "$installDir"
+    else
+      # Subtlety: We only increment i if the line was NOT removed from games.db,
+      # because removing the line shifts all subsequent lines one line up.
+      ((++i))
+    fi
+  done < "$dbFile"
+  i=1
   printf "Checking md5sums..."
   while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
     pushd "$installDir" > /dev/null || exit
@@ -373,7 +385,8 @@ listGames() {
       if [ -z "$gapi" ] && [ -f "$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))" 2>&1)" ] && [ "$gmd5" == "$(md5sum "$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))")" | awk '{ print $1 }')" ]; then gapiln="$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))")"; fi
     fi
     popd > /dev/null || exit
-    gamesList="$gamesList$((++i))) Game:\t\t$([ -f "$installDir/$gameName" ] && printf "\e[32m" || printf "%b" "\e[31m")$gameName\e[0m\t\t$([ -L "$installDir/$gapiln" ] && printf "%b" "\e[32m[$gapiln -> $([ ! -f "$(readlink -f "$installDir/$gapiln")" ] && printf "%b" "\e[0m\e[31m")$(basename "$(readlink -f "$installDir/$gapiln")")\e[0m\e[32m]\e[0m" || ([ -f "$installDir/$gapiln" ] && printf "\e[33m[%s]\e[0m" "$gapiln" || printf "%b" "\e[31mGShade symlink not found!\e[0m")) $([ -n "$gitInstall" ] && printf "\t\t\e[33m-- GIT INSTALLATION\e[0m")\n\tInstalled to:\t$([ ! -d "$installDir" ] && printf "%b" "\e[31m")${installDir/#$HOME/"\$HOME"}\e[0m\n\tWINEPREFIX:\t$([ ! -d "$prefixDir" ] && printf "%b" "\e[31m")${prefixDir/#$HOME/"\$HOME"}\e[0m\n"
+    gamesList="$gamesList$i) Game:\t\t$([ -f "$installDir/$gameName" ] && printf "\e[32m" || printf "%b" "\e[31m")$gameName\e[0m\t\t$([ -L "$installDir/$gapiln" ] && printf "%b" "\e[32m[$gapiln -> $([ ! -f "$(readlink -f "$installDir/$gapiln")" ] && printf "%b" "\e[0m\e[31m")$(basename "$(readlink -f "$installDir/$gapiln")")\e[0m\e[32m]\e[0m" || ([ -f "$installDir/$gapiln" ] && printf "\e[33m[%s]\e[0m" "$gapiln" || printf "%b" "\e[31mGShade symlink not found!\e[0m")) $([ -n "$gitInstall" ] && printf "\t\t\e[33m-- GIT INSTALLATION\e[0m")\n\tInstalled to:\t$([ ! -d "$installDir" ] && printf "%b" "\e[31m")${installDir/#$HOME/"\$HOME"}\e[0m\n\tWINEPREFIX:\t$([ ! -d "$prefixDir" ] && printf "%b" "\e[31m")${prefixDir/#$HOME/"\$HOME"}\e[0m\n"
+    ((++i))
   done < "$dbFile"
   printf "\e[2K\r"
   return 0 
