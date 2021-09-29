@@ -432,7 +432,7 @@ cleanWineLinks() {
   if ( validPrefix ); then
     export WINEPREFIX
     wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v d3dcompiler_47 /f > /dev/null 2>&1
-    oldGapi="$(basename "$(find -maxdepth 1 -lname "$GShadeHome/GShade*.dll" -exec basename {} ';')" .dll)"
+    oldGapi="$(basename "$(find '.' -maxdepth 1 -lname "$GShadeHome/GShade*.dll" -exec basename {} ';')" .dll)"
     wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${oldGapi}" /f > /dev/null 2>&1
   fi
   find "$gameLoc" -maxdepth 1 -lname "$GShadeHome/*" -delete > /dev/null 2>&1
@@ -522,7 +522,7 @@ XIVinstall() {
 
   ##
   # This will be relevant if it exists.
-  readarray -d '' lutrisYaml < <(find "$XDG_CONFIG_HOME"/lutris/games/ -name 'final-fantasy-xiv*' -print0 2>/dev/null)
+  lutrisYaml=($(find "$XDG_CONFIG_HOME"/lutris/games/ -name 'final-fantasy-xiv*' -print 2>/dev/null))
 
   if [ -z "$WINEPREFIX" ]; then WINEPREFIX="$HOME/.wine"; fi
 
@@ -577,7 +577,7 @@ XIVinstall() {
   fi
 
   ## Non-standard Steam locations contributed by JacoG-RH
-  readarray -t steamDirs < <(cat ~/.steam/steam/steamapps/libraryfolders.vdf | grep "path" | awk '{ print $2  }' | sed s/\"//g)
+  steamDirs=($(cat ~/.steam/steam/steamapps/libraryfolders.vdf | grep "path" | awk '{ print $2  }' | sed s/\"//g))
   steamDirs=("${steamDirs[@]}" "$HOME/.steam/steam")
   for checkDir in "${steamDirs[@]}"; do
     if [ -d "${checkDir}/steamapps/compatdata/39210/pfx" ]; then ffxivDir="${checkDir}"; fi
