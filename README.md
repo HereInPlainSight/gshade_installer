@@ -54,9 +54,18 @@ You can get just the games.db list by requesting it with `./gshade_installer.sh 
 
 If you're having trouble and asking a friend for help, you can use `./gshade_installer.sh debug upload` and give your friend the URL.  They can use the URL with `curl <URL>` to see the exact output you would see if you ran the debug yourself.
 
+## Troubleshooting
+
+Q: Help, I'm using the default launcher but once I install GShade, the launcher stops launching!
+
+A: Known issue -- with the 32-bit launcher.
+   - Lutris: Open XIV's `Configure`, in the `Game Options` tab change the `Executable` from `ffxivboot.exe` to `ffxivboot64.exe`.
+   - Steam: Open XIV's `properties` dialog and set your `Launch Options` to:
+     - `echo "%command%" | sed 's/ffxivboot.exe/ffxivboot64.exe/' | sh`
+
 ## Help
 
-If you need help, please check the [GPoser's discord](https://discord.gg/gposers) for the `gshade-troubleshooting` channel.
+If you need further help, please check the [GPoser's discord](https://discord.gg/gposers) for the `gshade-troubleshooting` channel.
 
 ## Acknowledgments
 
