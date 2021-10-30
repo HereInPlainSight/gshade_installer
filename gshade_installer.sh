@@ -22,6 +22,7 @@ gamesList=""
 gapi=""
 ARCH=""
 forceUpdate=0
+wineLoc=""
 
 declare -a iniSettings=()
 
@@ -431,6 +432,7 @@ forgetGame() {
 cleanWineLinks() {
   if ( validPrefix ); then
     export WINEPREFIX
+    if [ -n "$wineLoc" ]; then wine="$wineLoc/wine"; else wine="wine"; fi
     wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v d3dcompiler_47 /f > /dev/null 2>&1
     oldGapi="$(basename "$(find '.' -maxdepth 1 -lname "$GShadeHome/GShade*.dll" -exec basename {} ';')" .dll)"
     wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${oldGapi}" /f > /dev/null 2>&1
@@ -481,8 +483,9 @@ installGame() {
   ln -sfn "$GShadeHome/GShade${ARCH}.dll" "${gapi}".dll
   if [ $? != 0 ] || [ ! -L "${gapi}.dll" ]; then cp "$GShadeHome/GShade${ARCH}.dll" "$gapi".dll; fi
   export WINEPREFIX
-  wine reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v d3dcompiler_47 /d native /f >/dev/null 2>&1
-  wine reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${gapi}" /d native,builtin /f >/dev/null 2>&1
+  if [ -n "$wineLoc" ]; then wine="$wineLoc/wine"; else wine="wine"; fi
+  $wine reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v d3dcompiler_47 /d native /f >/dev/null 2>&1
+  $wine reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${gapi}" /d native,builtin /f >/dev/null 2>&1
   if [ ! -f "GShade.ini" ]; then cp "$GShadeHome/GShade.ini" "GShade.ini"; fi
   ln -sfn "$GShadeHome/gshade-shaders" "gshade-shaders"
   if [ $? != 0 ] || [ ! -L "gshade-shaders" ]; then cp -a "$GShadeHome/gshade-shaders" "gshade-shaders"; fi
@@ -566,6 +569,8 @@ XIVinstall() {
     if [ ${#lutrisYaml[@]} -gt 1 ]; then printf "\nFound %s Lutris installs!" "${#lutrisYaml[@]}"; else printf "\nLutris install found!"; fi
     for i in ${lutrisYaml[@]}; do
       WINEPREFIX="$(awk -F': ' '/prefix/{print $2}' "$i")"
+      winever="$(awk -F': ' '/version/{print $2}' "$i")"
+      if [ -n "$XDG_DATA_HOME/lutris/runners/wine/$winever" ]; then wineLoc="$XDG_DATA_HOME/lutris/runners/wine/$winever/bin/"; fi
       gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
       printf "\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
       if (yesNo "Install? "); then
