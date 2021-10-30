@@ -433,9 +433,9 @@ cleanWineLinks() {
   if ( validPrefix ); then
     export WINEPREFIX
     if [ -n "$wineLoc" ]; then wine="$wineLoc/wine"; else wine="wine"; fi
-    wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v d3dcompiler_47 /f > /dev/null 2>&1
+    $wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v d3dcompiler_47 /f > /dev/null 2>&1
     oldGapi="$(basename "$(find '.' -maxdepth 1 -lname "$GShadeHome/GShade*.dll" -exec basename {} ';')" .dll)"
-    wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${oldGapi}" /f > /dev/null 2>&1
+    $wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${oldGapi}" /f > /dev/null 2>&1
   fi
   find "$gameLoc" -maxdepth 1 -lname "$GShadeHome/*" -delete > /dev/null 2>&1
 }
@@ -572,6 +572,9 @@ XIVinstall() {
       winever="$(awk -F': ' '/version/{print $2}' "$i")"
       if [ -n "$XDG_DATA_HOME/lutris/runners/wine/$winever" ]; then wineLoc="$XDG_DATA_HOME/lutris/runners/wine/$winever/bin/"; fi
       gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
+      if [ ! -d "$gameLoc" ]; then
+        gameLoc=$(find -L "$WINEPREFIX/drive_c" -name 'ffxiv_dx11.exe' -exec dirname {} ';')
+      fi
       printf "\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
       if (yesNo "Install? "); then
         printf "\nInstalling...  "
