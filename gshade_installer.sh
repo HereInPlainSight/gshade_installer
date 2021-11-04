@@ -15,21 +15,6 @@ GShadeHome="$XDG_DATA_HOME/GShade"
 dbFile="$GShadeHome/games.db"
 
 ##
-# Checking if running on Mac
-IS_MAC=false
-if [[ $OSTYPE == 'darwin'* ]]; then
-  IS_MAC=true
-  if [ ! hash wine]; then
-    if [ -d "$cxLoc/Contents/SharedSupport/CrossOver/bin" ]; then
-      wineLoc="$cxLoc/Contents/SharedSupport/CrossOver/bin"
-    else
-      printf "Could not find a valid CrossOver install at: %s and wine is not installed\n", "$cxLoc"
-      exit 1
-    fi
-  fi
-fi
-
-##
 # Yeah I think this'll make life easier.
 gameExe=""
 gameLoc=""
@@ -38,7 +23,22 @@ gapi=""
 ARCH=""
 forceUpdate=0
 wineLoc=""
+
+##
+# Checking if running on Mac
+IS_MAC=false
 cxLoc="/Applications/CrossOver.app" #this should be identical on all macs
+if [[ $OSTYPE == 'darwin'* ]]; then
+  IS_MAC=true
+  if ( ! hash wine &>/dev/null ); then
+    if [ -d "$cxLoc/Contents/SharedSupport/CrossOver/bin" ]; then
+      wineLoc="$cxLoc/Contents/SharedSupport/CrossOver/bin"
+    else
+      printf "Could not find a valid CrossOver install at: %s and wine is not installed\n", "$cxLoc"
+      exit 1
+    fi
+  fi
+fi
 
 declare -a iniSettings=()
 
@@ -321,11 +321,11 @@ update() {
       fi
     done
     if [ "$IS_MAC" = true ] && [ "$mia" = "wine" ]; then
-      if [ -n "$wineLoc" ]; then
-        mia=""
-      else
+      if [ -z "$wineLoc" ]; then
         printf "Could not find a valid CrossOver install at: %s and wine is not installed\n", "$cxLoc"
         exit 1
+      else
+        mia=""
       fi
     fi
     if [ -n "$mia" ]; then
