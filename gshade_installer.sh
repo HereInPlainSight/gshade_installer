@@ -17,7 +17,17 @@ dbFile="$GShadeHome/games.db"
 ##
 # Checking if running on Mac
 IS_MAC=false
-if [[ $OSTYPE == 'darwin'* ]]; then IS_MAC=true; fi
+if [[ $OSTYPE == 'darwin'* ]]; then
+  IS_MAC=true
+  if [ ! hash wine]; then
+    if [ -d "$cxLoc/Contents/SharedSupport/CrossOver/bin" ]; then
+      wineLoc="$cxLoc/Contents/SharedSupport/CrossOver/bin"
+    else
+      printf "Could not find a valid CrossOver install at: %s and wine is not installed\n", "$cxLoc"
+      exit 1
+    fi
+  fi
+fi
 
 ##
 # Yeah I think this'll make life easier.
@@ -311,11 +321,10 @@ update() {
       fi
     done
     if [ "$IS_MAC" = true ] && [ "$mia" = "wine" ]; then
-      if [ -d "$cxLoc/Contents/SharedSupport/CrossOver/bin" ]; then
-        wineLoc="$cxLoc/Contents/SharedSupport/CrossOver/bin"
+      if [ -n "$wineLoc" ]; then
         mia=""
       else
-        printf "Could not find a valid CrossOver install at: %s and wine is not installed\n", "$mia"
+        printf "Could not find a valid CrossOver install at: %s and wine is not installed\n", "$cxLoc"
         exit 1
       fi
     fi
