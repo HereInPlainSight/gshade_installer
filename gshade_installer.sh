@@ -15,6 +15,11 @@ GShadeHome="$XDG_DATA_HOME/GShade"
 dbFile="$GShadeHome/games.db"
 
 ##
+# Checking if running on Mac
+IS_MAC=false
+if [[ $OSTYPE == 'darwin'* ]]; then IS_MAC=true; fi
+
+##
 # Yeah I think this'll make life easier.
 gameExe=""
 gameLoc=""
@@ -74,6 +79,16 @@ readNumber() {
       *) return "$(echo "$yn" | tr -d '\r\n')";;
     esac
   done
+}
+
+##
+# Function to output only the md5 checksum
+getMD5() {
+  if [ "$IS_MAC" = true ] ; then
+    md5 -q $1
+  else
+    md5sum $1 | awk '{ print $1 }'
+  fi
 }
 
 ##
@@ -141,16 +156,20 @@ fetchCompilers() {
     printf "\e[2K\rDownloading 64-bit compiler...  "
     ##
     # Sourced from Lutris.  I don't even remember how I found this was sitting there.
-    wget -q https://lutris.net/files/tools/dll/d3dcompiler_47.dll
+    curl -sO https://lutris.net/files/tools/dll/d3dcompiler_47.dll
     mv d3dcompiler_47.dll d3dcompiler_47.dll.64bit
     printf "Done!"
     # The following was originally sourced from The_Riesi @ https://www.reddit.com/r/linux_gaming/comments/b2hi3g/reshade_working_in_wine_43/, but the link is now dead.
     # Utilizing the same method winetricks uses.
-    printf "\e[2K\rDownloading 32-bit compiler...  "
-##    wget -q http://dege.freeweb.hu/dgVoodoo2/D3DCompiler_47.zip && unzip -q D3DCompiler_47.zip && rm D3DCompiler_47.zip
-    wget -qq https://download-installer.cdn.mozilla.net/pub/firefox/releases/62.0.3/win32/ach/Firefox%20Setup%2062.0.3.exe && 7z e -y "Firefox Setup 62.0.3.exe" "core/d3dcompiler_47.dll" >> /dev/null && rm "Firefox Setup 62.0.3.exe"
-    mv d3dcompiler_47.dll d3dcompiler_47.dll.32bit
-    printf "Done!"
+    if [ "$IS_MAC" = true ] ; then
+      printf "\e[2K\rNot downloading 32-bit compiler since running on Mac!"
+    else
+      printf "\e[2K\rDownloading 32-bit compiler...  "
+  ##    wget -q http://dege.freeweb.hu/dgVoodoo2/D3DCompiler_47.zip && unzip -q D3DCompiler_47.zip && rm D3DCompiler_47.zip
+      curl -sO https://download-installer.cdn.mozilla.net/pub/firefox/releases/62.0.3/win32/ach/Firefox%20Setup%2062.0.3.exe && 7z e -y "Firefox%20Setup%2062.0.3.exe" "core/d3dcompiler_47.dll" >> /dev/null && rm "Firefox%20Setup%2062.0.3.exe"
+      mv d3dcompiler_47.dll d3dcompiler_47.dll.32bit
+      printf "Done!"
+    fi
     popd > /dev/null || exit
     printf "\e[2K\rd3dcompiler_47s downloaded\n"
 }
@@ -249,9 +268,9 @@ updateInstalls() {
         gName=$(basename "$(find "$installDir" -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))")
         if [ -f "$installDir/opengl32.dll" ]; then gName="opengl32.dll"; fi
         if [[ $gName != "" ]]; then
-          if [[ "$(md5sum "$installDir/${gName}" | awk '{ print $1 }')" == "$md5goal" ]]; then cp -f "GShade${gArch}.dll" "$installDir/${gName}.dll"; fi
+          if [[ "$(printMD5 "$installDir/${gName}")" == "$md5goal" ]]; then cp -f "GShade${gArch}.dll" "$installDir/${gName}.dll"; fi
         fi
-        if [ -f "$installDir/dxgi.dll" ] && [[ "$(md5sum "$installDir/dxgi.dll" | awk '{ print $1}')" == "$md5goal" ]]; then cp -f "GShade${gArch}.dll" "$installDir/dxgi.dll"; fi
+        if [ -f "$installDir/dxgi.dll" ] && [[ "$(getMD5 "$installDir/dxgi.dll")" == "$md5goal" ]]; then cp -f "GShade${gArch}.dll" "$installDir/dxgi.dll"; fi
       fi
       # Hard install update end.
   done < "$dbFile"
@@ -278,7 +297,11 @@ presetUpdate() {
 update() {
   if [ ! -d "$GShadeHome" ]; then
     if (yesNo "GShade initial install not found, would you like to create it?  "); then printf "\nCreating...  "; else printf "\nAborting installation.\n"; exit 1; fi
-    prereqs=(7z awk find ln md5sum sed unzip wget wine)
+    if [ "$IS_MAC" = true ] ; then
+      prereqs=(awk find ln md5 sed unzip curl wine)
+    else
+      prereqs=(7z awk find ln md5sum sed unzip curl wine)
+    if
     mia=""
     for i in "${prereqs[@]}"; do
       if ( ! hash "$i" &>/dev/null );
@@ -329,8 +352,8 @@ update() {
     rm -rf "GShade.Latest.zip" "gshade-shaders"
     if [[ -f "$GShadeHome/GShade64.dll" ]]; then
       printf "\e[2K\rmd5sums in process..."
-      old64="$(md5sum GShade64.dll | awk '{ print $1 }')"
-      old32="$(md5sum GShade32.dll | awk '{ print $1 }')"
+      old64="$(getMD5 GShade64.dll)"
+      old32="$(getMD5 GShade32.dll)"
     fi
     printf "\e[2K\rDownloading latest GShade...                     "
     wget -q https://github.com/Mortalitas/GShade/releases/latest/download/GShade.Latest.zip
@@ -376,14 +399,14 @@ listGames() {
       fileString="$(file "$gameName")"
       gmd5=""
       if printf "%s" "$fileString" | grep -q "80386"; then
-        gmd5="$(md5sum "$GShadeHome/GShade32.dll" | awk '{ print $1 }')"
+        gmd5="$(getMD5 "$GShadeHome/GShade32.dll")"
       elif printf "%s" "$fileString" | grep -q "x86-64"; then
-        gmd5="$(md5sum "$GShadeHome/GShade64.dll" | awk '{ print $1 }')"
+        gmd5="$(getMD5 "$GShadeHome/GShade64.dll")"
       fi
       # Check dxgi and opengl32 before we start hitting find up.
-      if [ -f "dxgi.dll" ] && [ "$gmd5" == "$(md5sum "dxgi.dll" | awk '{ print $1 }')" ]; then gapiln="dxgi.dll"; fi
-      if [ -z "$gapi" ] && [ -f "opengl32.dll" ] && [ "$gmd5" == "$(md5sum "opengl32.dll" | awk '{ print $1 }')" ]; then gapiln="opengl32.dll"; fi
-      if [ -z "$gapi" ] && [ -f "$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))" 2>&1)" ] && [ "$gmd5" == "$(md5sum "$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))")" | awk '{ print $1 }')" ]; then gapiln="$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))")"; fi
+      if [ -f "dxgi.dll" ] && [ "$gmd5" == "$(getMD5 "dxgi.dll")" ]; then gapiln="dxgi.dll"; fi
+      if [ -z "$gapi" ] && [ -f "opengl32.dll" ] && [ "$gmd5" == "$(getMD5 "opengl32.dll")" ]; then gapiln="opengl32.dll"; fi
+      if [ -z "$gapi" ] && [ -f "$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))" 2>&1)" ] && [ "$gmd5" == "$(getMD5 "$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))")")" ]; then gapiln="$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))")"; fi
     fi
     popd > /dev/null || exit
     gamesList="$gamesList$i) Game:\t\t$([ -f "$installDir/$gameName" ] && printf "\e[32m" || printf "%b" "\e[31m")$gameName\e[0m\t\t$([ -L "$installDir/$gapiln" ] && printf "%b" "\e[32m[$gapiln -> $([ ! -f "$(readlink -f "$installDir/$gapiln")" ] && printf "%b" "\e[0m\e[31m")$(basename "$(readlink -f "$installDir/$gapiln")")\e[0m\e[32m]\e[0m" || ([ -f "$installDir/$gapiln" ] && printf "\e[33m[%s]\e[0m" "$gapiln" || printf "%b" "\e[31mGShade symlink not found!\e[0m")) $([ -n "$gitInstall" ] && printf "\t\t\e[33m-- GIT INSTALLATION\e[0m")\n\tInstalled to:\t$([ ! -d "$installDir" ] && printf "%b" "\e[31m")${installDir/#$HOME/"\$HOME"}\e[0m\n\tWINEPREFIX:\t$([ ! -d "$prefixDir" ] && printf "%b" "\e[31m")${prefixDir/#$HOME/"\$HOME"}\e[0m\n"
