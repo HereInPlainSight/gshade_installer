@@ -283,7 +283,7 @@ presetUpdate() {
   timestamp=$(date +"%Y-%m-%d/%T")
   if [ -f "version" ]; then performBackup "$timestamp"; [ -d "$GShadeHome/git" ] && gitUpdate "$timestamp"; fi
   printf "Updating presets..."
-  wget -q https://github.com/Mortalitas/GShade-Presets/archive/master.zip
+  curl -sO https://github.com/Mortalitas/GShade-Presets/archive/master.zip
   unzip -qquo master.zip && rm -r master.zip gshade-presets
   mv "GShade-Presets-master" "gshade-presets"
   updateInstalls presets
@@ -356,7 +356,7 @@ update() {
       old32="$(getMD5 GShade32.dll)"
     fi
     printf "\e[2K\rDownloading latest GShade...                     "
-    wget -q https://github.com/Mortalitas/GShade/releases/latest/download/GShade.Latest.zip
+    curl -sO https://github.com/Mortalitas/GShade/releases/latest/download/GShade.Latest.zip
     unzip -qquo GShade.Latest.zip
     printf "\e[2K\rRestoring any applicable GShade.ini settings...  "
     restoreSettings
