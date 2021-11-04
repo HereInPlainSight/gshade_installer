@@ -28,6 +28,7 @@ gapi=""
 ARCH=""
 forceUpdate=0
 wineLoc=""
+cxLoc="/Applications/CrossOver.app" #this should be identical on all macs
 
 declare -a iniSettings=()
 
@@ -163,9 +164,10 @@ fetchCompilers() {
     # Utilizing the same method winetricks uses.
     if [ "$IS_MAC" = true ] ; then
       printf "\e[2K\rNot downloading 32-bit compiler since running on Mac!"
+      touch d3dcompiler_47.dll.32bit #placing stub
     else
       printf "\e[2K\rDownloading 32-bit compiler...  "
-  ##    wget -q http://dege.freeweb.hu/dgVoodoo2/D3DCompiler_47.zip && unzip -q D3DCompiler_47.zip && rm D3DCompiler_47.zip
+  ##    curl -sO http://dege.freeweb.hu/dgVoodoo2/D3DCompiler_47.zip && unzip -q D3DCompiler_47.zip && rm D3DCompiler_47.zip
       curl -sO https://download-installer.cdn.mozilla.net/pub/firefox/releases/62.0.3/win32/ach/Firefox%20Setup%2062.0.3.exe && 7z e -y "Firefox%20Setup%2062.0.3.exe" "core/d3dcompiler_47.dll" >> /dev/null && rm "Firefox%20Setup%2062.0.3.exe"
       mv d3dcompiler_47.dll d3dcompiler_47.dll.32bit
       printf "Done!"
@@ -283,7 +285,7 @@ presetUpdate() {
   timestamp=$(date +"%Y-%m-%d/%T")
   if [ -f "version" ]; then performBackup "$timestamp"; [ -d "$GShadeHome/git" ] && gitUpdate "$timestamp"; fi
   printf "Updating presets..."
-  curl -sO https://github.com/Mortalitas/GShade-Presets/archive/master.zip
+  curl -sLO https://github.com/Mortalitas/GShade-Presets/archive/master.zip
   unzip -qquo master.zip && rm -r master.zip gshade-presets
   mv "GShade-Presets-master" "gshade-presets"
   updateInstalls presets
@@ -301,13 +303,22 @@ update() {
       prereqs=(awk find ln md5 sed unzip curl wine)
     else
       prereqs=(7z awk find ln md5sum sed unzip curl wine)
-    if
+    fi
     mia=""
     for i in "${prereqs[@]}"; do
       if ( ! hash "$i" &>/dev/null );
         then if [ -n "$mia" ]; then mia+=", $i"; else mia="$i"; fi
       fi
     done
+    if [ "$IS_MAC" = true ] && [ "$mia" = "wine" ]; then
+      if [ -d "$cxLoc/Contents/SharedSupport/CrossOver/bin" ]; then
+        wineLoc="$cxLoc/Contents/SharedSupport/CrossOver/bin"
+        mia=""
+      else
+        printf "Could not find a valid CrossOver install at: %s and wine is not installed\n", "$mia"
+        exit 1
+      fi
+    fi
     if [ -n "$mia" ]; then
       printf "The following necessary command(s) could not be found: %s\n", "$mia"
       exit 1
@@ -356,7 +367,7 @@ update() {
       old32="$(getMD5 GShade32.dll)"
     fi
     printf "\e[2K\rDownloading latest GShade...                     "
-    curl -sO https://github.com/Mortalitas/GShade/releases/latest/download/GShade.Latest.zip
+    curl -sLO https://github.com/Mortalitas/GShade/releases/latest/download/GShade.Latest.zip
     unzip -qquo GShade.Latest.zip
     printf "\e[2K\rRestoring any applicable GShade.ini settings...  "
     restoreSettings
