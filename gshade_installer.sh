@@ -268,7 +268,7 @@ updateInstalls() {
         gName=$(basename "$(find "$installDir" -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))")
         if [ -f "$installDir/opengl32.dll" ]; then gName="opengl32.dll"; fi
         if [[ $gName != "" ]]; then
-          if [[ "$(printMD5 "$installDir/${gName}")" == "$md5goal" ]]; then cp -f "GShade${gArch}.dll" "$installDir/${gName}.dll"; fi
+          if [[ "$(getMD5 "$installDir/${gName}")" == "$md5goal" ]]; then cp -f "GShade${gArch}.dll" "$installDir/${gName}.dll"; fi
         fi
         if [ -f "$installDir/dxgi.dll" ] && [[ "$(getMD5 "$installDir/dxgi.dll")" == "$md5goal" ]]; then cp -f "GShade${gArch}.dll" "$installDir/dxgi.dll"; fi
       fi
