@@ -33,7 +33,7 @@ cxLoc="/Applications/CrossOver.app" #this should be identical on all macs
 if [[ $OSTYPE == 'darwin'* ]]; then
   IS_MAC=true
   printf "Running on macOS\n"
-  if ( ! hash wine &>/dev/null ); then
+  if ( ! hash wine64 &>/dev/null ); then
     if [ -d "$cxLoc/Contents/SharedSupport/CrossOver/bin" ]; then
       wineLoc="$cxLoc/Contents/SharedSupport/CrossOver/bin"
       wineBin="wineloader64"
@@ -41,6 +41,8 @@ if [[ $OSTYPE == 'darwin'* ]]; then
       printf "Could not find a valid CrossOver install at: %s and wine is not installed\n", "$cxLoc"
       exit 1
     fi
+  else
+    wineBin="wine64"
   fi
 fi
 
@@ -109,6 +111,17 @@ getMD5() {
 ##
 # Workaround for platforms that don't ship with gnu readlink
 readlinkf(){ perl -MCwd -e 'print Cwd::abs_path shift' "$1";}
+
+##
+# Function to convert a wine path towards a *nix path
+wineGetUnixFilename() {
+  if ( hash winepath &>/dev/null ); then
+    winepath -u "$1" 2>/dev/null | tr -d '\r\n'
+  else
+    if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
+    readlinkf "$(wine cmd /C "${winPath:0:2} & cd ${winPath:3} & winepath -u ./" 2>&1 | tail -1)" #black eorn magic
+  fi
+}
 
 ##
 # Backup GShade's gshade-shaders (and git shaders if they exist), as well as each games' gshade-presets/ and GShade.ini.
@@ -592,13 +605,13 @@ XIVinstall() {
       squareEnixLoc="$($wine reg query 'HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Uninstall\{2B41E132-07DF-4925-A3D3-F2D1765CCDFE}' /v InstallLocation 2>/dev/null | grep InstallLocation | sed -E 's/^\s+InstallLocation\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
 
       if [ -n "$squareEnixLoc" ]; then
-        gameLoc="$(winepath -u "$squareEnixLoc\\FINAL FANTASY XIV - A Realm Reborn\\game\\" 2>/dev/null | tr -d '\r\n')"
+        gameLoc="$(wineGetUnixFilename "$squareEnixLoc\\FINAL FANTASY XIV - A Realm Reborn\\game\\")"
       else
         # Failing that, check for a Wine Steam install.
 	steamLoc="$($wine reg query "HKLM\\Software\\Valve\\Steam" /v InstallPath 2>/dev/null | grep InstallPath | sed -E 's/^\s+InstallPath\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
 
 	if [ -n "$steamLoc" ]; then
-	  gameLoc="$(winepath "$steamLoc" 2>/dev/null | tr -d '\r\n')/steamapps/common/FINAL FANTASY XIV Online/game/"
+	  gameLoc="$(wineGetUnixFilename "$steamLoc")/steamapps/common/FINAL FANTASY XIV Online/game/"
 	fi
       fi
     fi
@@ -634,6 +647,42 @@ XIVinstall() {
         printf "\nInstalling...  "
         installGame
         printf "Complete!\n"
+      fi
+    done
+  fi
+
+  if [ -d "$CX_BOTTLE_PATH" ]; then
+    printf "\nCrossOver install found!"
+    find "$CX_BOTTLE_PATH" -maxdepth 1 -mindepth 1 -type d | while read checkDir; do
+      WINEPREFIX="$checkDir"
+      gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
+
+      ## Querying location from registry, ~/.wine checking, and Wine Steam install are all contributed by Maia-Everett.
+      if [ ! -d "$gameLoc" ]; then
+      # Try to read game location from registry
+        squareEnixLoc="$($wine reg query 'HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Uninstall\{2B41E132-07DF-4925-A3D3-F2D1765CCDFE}' /v InstallLocation 2>/dev/null | grep InstallLocation | sed -E 's/^\s+InstallLocation\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
+
+        if [ -n "$squareEnixLoc" ]; then
+          gameLoc="$(wineGetUnixFilename "$squareEnixLoc\\FINAL FANTASY XIV - A Realm Reborn\\game\\")"
+        else
+          # Failing that, check for a Wine Steam install.
+        steamLoc="$($wine reg query "HKLM\\Software\\Valve\\Steam" /v InstallPath 2>/dev/null | grep InstallPath | sed -E 's/^\s+InstallPath\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
+
+      if [ -n "$steamLoc" ]; then
+        gameLoc="$(wineGetUnixFilename "$steamLoc")/steamapps/common/FINAL FANTASY XIV Online/game/"
+      fi
+        fi
+      fi
+
+      if [ ! -d "$gameLoc" ]; then continue
+      else
+        printf "\nWine install found!\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
+        if (yesNo "Install? "); then
+          if ( ! yesNo "Use $gapi instead of dxgi?  If you are having issues with GShade when using other overlays (Steam or Discord, for instance), you may wish to try dxgi mode instead." ); then gapi=dxgi; fi
+          printf "\nInstalling...  ";
+          installGame
+          printf "Complete!\n"
+        fi
       fi
     done
   fi
