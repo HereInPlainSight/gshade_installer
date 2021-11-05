@@ -10,6 +10,7 @@
 # Housekeeping to respect user's configurations.
 if [ -z "$XDG_CONFIG_HOME" ]; then XDG_CONFIG_HOME="$HOME/.config"; fi
 if [ -z "$XDG_DATA_HOME" ]; then XDG_DATA_HOME="$HOME/.local/share"; fi
+if [ -z "$CX_BOTTLE_PATH" ]; then CX_BOTTLE_PATH="$HOME/Library/Application Support/CrossOver/Bottles"; fi
 
 GShadeHome="$XDG_DATA_HOME/GShade"
 dbFile="$GShadeHome/games.db"
@@ -23,6 +24,7 @@ gapi=""
 ARCH=""
 forceUpdate=0
 wineLoc=""
+wineBin="wine"
 
 ##
 # Checking if running on Mac
@@ -30,9 +32,11 @@ IS_MAC=false
 cxLoc="/Applications/CrossOver.app" #this should be identical on all macs
 if [[ $OSTYPE == 'darwin'* ]]; then
   IS_MAC=true
+  printf "Running on macOS\n"
   if ( ! hash wine &>/dev/null ); then
     if [ -d "$cxLoc/Contents/SharedSupport/CrossOver/bin" ]; then
       wineLoc="$cxLoc/Contents/SharedSupport/CrossOver/bin"
+      wineBin="wineloader64"
     else
       printf "Could not find a valid CrossOver install at: %s and wine is not installed\n", "$cxLoc"
       exit 1
@@ -101,6 +105,10 @@ getMD5() {
     md5sum $1 | awk '{ print $1 }'
   fi
 }
+
+##
+# Workaround for platforms that don't ship with gnu readlink
+readlinkf(){ perl -MCwd -e 'print Cwd::abs_path shift' "$1";}
 
 ##
 # Backup GShade's gshade-shaders (and git shaders if they exist), as well as each games' gshade-presets/ and GShade.ini.
@@ -296,7 +304,11 @@ presetUpdate() {
   if [ -f "version" ]; then performBackup "$timestamp"; [ -d "$GShadeHome/git" ] && gitUpdate "$timestamp"; fi
   printf "Updating presets..."
   curl -sLO https://github.com/Mortalitas/GShade-Presets/archive/master.zip
-  unzip -qquo master.zip && rm -r master.zip gshade-presets
+  if [ "$IS_MAC" = true ] ; then
+    ditto -xk master.zip . && rm -r master.zip gshade-presets #has to be extracted with ditto because of special chars on APFS
+  else
+    unzip -qquo master.zip && rm -r master.zip gshade-presets
+  fi
   mv "GShade-Presets-master" "gshade-presets"
   updateInstalls presets
   popd > /dev/null || exit
@@ -310,24 +322,17 @@ update() {
   if [ ! -d "$GShadeHome" ]; then
     if (yesNo "GShade initial install not found, would you like to create it?  "); then printf "\nCreating...  "; else printf "\nAborting installation.\n"; exit 1; fi
     if [ "$IS_MAC" = true ] ; then
-      prereqs=(awk find ln md5 sed unzip curl wine)
+      prereqs=(awk find ln md5 sed unzip ditto curl perl wine)
     else
-      prereqs=(7z awk find ln md5sum sed unzip curl wine)
+      prereqs=(7z awk find ln md5sum sed unzip curl perl wine)
     fi
     mia=""
     for i in "${prereqs[@]}"; do
-      if ( ! hash "$i" &>/dev/null );
-        then if [ -n "$mia" ]; then mia+=", $i"; else mia="$i"; fi
+      if ( ! hash "$i" &>/dev/null ); then
+        if [ "$i" = "wine" ] && [ -n "$wineLoc" ]; then continue; fi
+        if [ -n "$mia" ]; then mia+=", $i"; else mia="$i"; fi
       fi
     done
-    if [ "$IS_MAC" = true ] && [ "$mia" = "wine" ]; then
-      if [ -z "$wineLoc" ]; then
-        printf "Could not find a valid CrossOver install at: %s and wine is not installed\n", "$cxLoc"
-        exit 1
-      else
-        mia=""
-      fi
-    fi
     if [ -n "$mia" ]; then
       printf "The following necessary command(s) could not be found: %s\n", "$mia"
       exit 1
@@ -429,7 +434,7 @@ listGames() {
       if [ -z "$gapi" ] && [ -f "$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))" 2>&1)" ] && [ "$gmd5" == "$(getMD5 "$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))")")" ]; then gapiln="$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))")"; fi
     fi
     popd > /dev/null || exit
-    gamesList="$gamesList$i) Game:\t\t$([ -f "$installDir/$gameName" ] && printf "\e[32m" || printf "%b" "\e[31m")$gameName\e[0m\t\t$([ -L "$installDir/$gapiln" ] && printf "%b" "\e[32m[$gapiln -> $([ ! -f "$(readlink -f "$installDir/$gapiln")" ] && printf "%b" "\e[0m\e[31m")$(basename "$(readlink -f "$installDir/$gapiln")")\e[0m\e[32m]\e[0m" || ([ -f "$installDir/$gapiln" ] && printf "\e[33m[%s]\e[0m" "$gapiln" || printf "%b" "\e[31mGShade symlink not found!\e[0m")) $([ -n "$gitInstall" ] && printf "\t\t\e[33m-- GIT INSTALLATION\e[0m")\n\tInstalled to:\t$([ ! -d "$installDir" ] && printf "%b" "\e[31m")${installDir/#$HOME/"\$HOME"}\e[0m\n\tWINEPREFIX:\t$([ ! -d "$prefixDir" ] && printf "%b" "\e[31m")${prefixDir/#$HOME/"\$HOME"}\e[0m\n"
+    gamesList="$gamesList$i) Game:\t\t$([ -f "$installDir/$gameName" ] && printf "\e[32m" || printf "%b" "\e[31m")$gameName\e[0m\t\t$([ -L "$installDir/$gapiln" ] && printf "%b" "\e[32m[$gapiln -> $([ ! -f "$(readlinkf "$installDir/$gapiln")" ] && printf "%b" "\e[0m\e[31m")$(basename "$(readlinkf "$installDir/$gapiln")")\e[0m\e[32m]\e[0m" || ([ -f "$installDir/$gapiln" ] && printf "\e[33m[%s]\e[0m" "$gapiln" || printf "%b" "\e[31mGShade symlink not found!\e[0m")) $([ -n "$gitInstall" ] && printf "\t\t\e[33m-- GIT INSTALLATION\e[0m")\n\tInstalled to:\t$([ ! -d "$installDir" ] && printf "%b" "\e[31m")${installDir/#$HOME/"\$HOME"}\e[0m\n\tWINEPREFIX:\t$([ ! -d "$prefixDir" ] && printf "%b" "\e[31m")${prefixDir/#$HOME/"\$HOME"}\e[0m\n"
     ((++i))
   done < "$dbFile"
   printf "\e[2K\r"
@@ -475,7 +480,7 @@ forgetGame() {
 cleanWineLinks() {
   if ( validPrefix ); then
     export WINEPREFIX
-    if [ -n "$wineLoc" ]; then wine="$wineLoc/wine"; else wine="wine"; fi
+    if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
     $wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v d3dcompiler_47 /f > /dev/null 2>&1
     oldGapi="$(basename "$(find '.' -maxdepth 1 -lname "$GShadeHome/GShade*.dll" -exec basename {} ';')" .dll)"
     $wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${oldGapi}" /f > /dev/null 2>&1
@@ -519,6 +524,11 @@ installGame() {
   pushd "$WINEPREFIX" > /dev/null || exit; WINEPREFIX="$(pwd)/"; popd > /dev/null || exit
 #  WINEPREFIX="${WINEPREFIX//+(\/)//}"		# Legacy, but interesting to remember.
   pushd "$gameLoc" > /dev/null || exit
+  # 32 bit installs are not supported (and really not recommended in any case) on macOS
+  if [ "$IS_MAC" = true ] && [ "$ARCH" = 32 ] ; then
+    printf "\nInstalling to 32-bit executables is not supported on macOS.  Exiting.\n"
+    exit 1
+  fi
   # Clean up an old install before the new soft links and reg edits are re-added.  Mostly to deal with changing gapi's.
   cleanWineLinks
   ln -sfn "$GShadeHome/d3dcompiler_47s/d3dcompiler_47.dll.${ARCH}bit" d3dcompiler_47.dll
@@ -526,7 +536,7 @@ installGame() {
   ln -sfn "$GShadeHome/GShade${ARCH}.dll" "${gapi}".dll
   if [ $? != 0 ] || [ ! -L "${gapi}.dll" ]; then cp "$GShadeHome/GShade${ARCH}.dll" "$gapi".dll; fi
   export WINEPREFIX
-  if [ -n "$wineLoc" ]; then wine="$wineLoc/wine"; else wine="wine"; fi
+  if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
   $wine reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v d3dcompiler_47 /d native /f >/dev/null 2>&1
   $wine reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${gapi}" /d native,builtin /f >/dev/null 2>&1
   if [ ! -f "GShade.ini" ]; then cp "$GShadeHome/GShade.ini" "GShade.ini"; fi
@@ -571,6 +581,7 @@ XIVinstall() {
   lutrisYaml=($(find "$XDG_CONFIG_HOME"/lutris/games/ -name 'final-fantasy-xiv*' -print 2>/dev/null))
 
   if [ -z "$WINEPREFIX" ]; then WINEPREFIX="$HOME/.wine"; fi
+  if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
 
   if ( validPrefix ); then
     gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
@@ -578,13 +589,13 @@ XIVinstall() {
     ## Querying location from registry, ~/.wine checking, and Wine Steam install are all contributed by Maia-Everett.
     if [ ! -d "$gameLoc" ]; then
       # Try to read game location from registry
-      squareEnixLoc="$(wine reg query 'HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Uninstall\{2B41E132-07DF-4925-A3D3-F2D1765CCDFE}' /v InstallLocation 2>/dev/null | grep InstallLocation | sed -E 's/^\s+InstallLocation\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
+      squareEnixLoc="$($wine reg query 'HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Uninstall\{2B41E132-07DF-4925-A3D3-F2D1765CCDFE}' /v InstallLocation 2>/dev/null | grep InstallLocation | sed -E 's/^\s+InstallLocation\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
 
       if [ -n "$squareEnixLoc" ]; then
         gameLoc="$(winepath -u "$squareEnixLoc\\FINAL FANTASY XIV - A Realm Reborn\\game\\" 2>/dev/null | tr -d '\r\n')"
       else
         # Failing that, check for a Wine Steam install.
-	steamLoc="$(wine reg query "HKLM\\Software\\Valve\\Steam" /v InstallPath 2>/dev/null | grep InstallPath | sed -E 's/^\s+InstallPath\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
+	steamLoc="$($wine reg query "HKLM\\Software\\Valve\\Steam" /v InstallPath 2>/dev/null | grep InstallPath | sed -E 's/^\s+InstallPath\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
 
 	if [ -n "$steamLoc" ]; then
 	  gameLoc="$(winepath "$steamLoc" 2>/dev/null | tr -d '\r\n')/steamapps/common/FINAL FANTASY XIV Online/game/"
