@@ -24,9 +24,18 @@ You can clone the repo and run the script from within it.  Instructions to do so
 
 ### Prerequisites
 
-To my knowledge this should work in virtually any Linux install that has access to bash and basic utilities.  `wget`, `ln`, `find`, `awk`, `sed`, `unzip`, `7z`*.  You need a local copy of WINE installed -- the version itself doesn't matter, but if you'll be using your local copy of WINE to ***play*** the game, you'll need 4.2 or above to get shaders to work.
+Universally required:
+* `awk`, `curl`, `find`, `hash`, `ln`, `perl`, `sed`, `unzip`, `wine`<sup>1</sup>
 
-\* As of 02-23-21, `7z` (generally provided by the `p7zip` package in most distros, `p7zip-full` on Ubuntu) is also required.  If you have a reliable source of the required 32-bit d3dcompiler that doesn't need it, I'm open to removing the requirement, but right now we're using the winetricks method.
+Additional requirements for Linux:
+* `7z`<sup>2</sup>, `md5sum`
+
+Additional requirements for Mac:
+* `ditto`, `md5`
+
+<sup>1</sup> A local copy of WINE is required -- the version itself doesn't matter, but if you'll be using your local copy of WINE to ***play*** the game, you'll need 4.2 or above to get shaders to work.
+
+<sup>2</sup> As of 02-23-21, `7z` (generally provided by the `p7zip` package in most distros, `p7zip-full` on Ubuntu) is also required.  If you have a reliable source of the required 32-bit d3dcompiler that doesn't need it, I'm open to removing the requirement, but right now we're using the winetricks method.
 
 ### Installation
 
@@ -73,6 +82,7 @@ If you need further help, please check the [GPoser's discord](https://discord.gg
 
 ## Contributors
 
-* JacoG-RH - Non-standard Steam libraries.
-* Maia-Everett - Support for Wine Steam, locating game via wine registry, and $HOME/.wine checking.
+* [@JacoG-RH](https://github.com/JacoG-RH) - Non-standard Steam libraries.
+* [@Maia-Everett](https://github.com/Maia-Everett) - Support for Wine Steam, locating game via wine registry, and `$HOME/.wine` checking.
+* [@marzent](https://github.com/marzent) - All the work to add Mac support.
 
