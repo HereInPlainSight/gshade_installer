@@ -651,42 +651,6 @@ XIVinstall() {
     done
   fi
 
-  if [ -d "$CX_BOTTLE_PATH" ]; then
-    printf "\nCrossOver install found!"
-    find "$CX_BOTTLE_PATH" -maxdepth 1 -mindepth 1 -type d | while read checkDir; do
-      WINEPREFIX="$checkDir"
-      gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
-
-      ## Querying location from registry, ~/.wine checking, and Wine Steam install are all contributed by Maia-Everett.
-      if [ ! -d "$gameLoc" ]; then
-      # Try to read game location from registry
-        squareEnixLoc="$($wine reg query 'HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Uninstall\{2B41E132-07DF-4925-A3D3-F2D1765CCDFE}' /v InstallLocation 2>/dev/null | grep InstallLocation | sed -E 's/^\s+InstallLocation\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
-
-        if [ -n "$squareEnixLoc" ]; then
-          gameLoc="$(wineGetUnixFilename "$squareEnixLoc\\FINAL FANTASY XIV - A Realm Reborn\\game\\")"
-        else
-          # Failing that, check for a Wine Steam install.
-        steamLoc="$($wine reg query "HKLM\\Software\\Valve\\Steam" /v InstallPath 2>/dev/null | grep InstallPath | sed -E 's/^\s+InstallPath\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
-
-      if [ -n "$steamLoc" ]; then
-        gameLoc="$(wineGetUnixFilename "$steamLoc")/steamapps/common/FINAL FANTASY XIV Online/game/"
-      fi
-        fi
-      fi
-
-      if [ ! -d "$gameLoc" ]; then continue
-      else
-        printf "\nWine install found!\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
-        if (yesNo "Install? "); then
-          if ( ! yesNo "Use $gapi instead of dxgi?  If you are having issues with GShade when using other overlays (Steam or Discord, for instance), you may wish to try dxgi mode instead." ); then gapi=dxgi; fi
-          printf "\nInstalling...  ";
-          installGame
-          printf "Complete!\n"
-        fi
-      fi
-    done
-  fi
-
   ## Non-standard Steam locations contributed by JacoG-RH
   steamDirs=($(cat ~/.steam/steam/steamapps/libraryfolders.vdf | grep "path" | awk '{ print $2  }' | sed s/\"//g))
   steamDirs=("${steamDirs[@]}" "$HOME/.steam/steam")
