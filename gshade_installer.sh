@@ -119,7 +119,7 @@ wineGetUnixFilename() {
     winepath -u "$1" 2>/dev/null | tr -d '\r\n'
   else
     if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
-    readlinkf "$(wine cmd /C "${winPath:0:2} & cd ${winPath:3} & winepath -u ./" 2>&1 | tail -1)" #black eorn magic
+    readlinkf "$(wine cmd /C "${1:0:2} & cd ${1:3} & winepath -u ./" 2>&1 | tail -1)" #black eorn magic
   fi
 }
 
