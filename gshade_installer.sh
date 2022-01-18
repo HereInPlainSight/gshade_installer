@@ -335,7 +335,7 @@ update() {
   if [ ! -d "$GShadeHome" ]; then
     if (yesNo "GShade initial install not found, would you like to create it?  "); then printf "\nCreating...  "; else printf "\nAborting installation.\n"; exit 1; fi
     if [ "$IS_MAC" = true ] ; then
-      prereqs=(awk find ln md5 sed unzip ditto curl perl wine)
+      prereqs=(awk find ln md5 sed unzip ditto curl perl)
     else
       prereqs=(7z awk find ln md5sum sed unzip curl perl wine)
     fi
@@ -652,7 +652,9 @@ XIVinstall() {
   fi
 
   ## Non-standard Steam locations contributed by JacoG-RH
-  steamDirs=($(cat ~/.steam/steam/steamapps/libraryfolders.vdf | grep "path" | awk '{ print $2  }' | sed s/\"//g))
+  if [ -f ~/.steam/steam/steamapps/libraryfolders.vdf ]; then
+    steamDirs=($(cat ~/.steam/steam/steamapps/libraryfolders.vdf | grep "path" | awk '{ print $2  }' | sed s/\"//g))
+  fi
   steamDirs=("${steamDirs[@]}" "$HOME/.steam/steam")
   for checkDir in "${steamDirs[@]}"; do
     if [ -d "${checkDir}/steamapps/compatdata/39210/pfx" ]; then ffxivDir="${checkDir}"; fi
