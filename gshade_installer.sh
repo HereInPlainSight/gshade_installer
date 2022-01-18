@@ -652,7 +652,9 @@ XIVinstall() {
   fi
 
   ## Non-standard Steam locations contributed by JacoG-RH
-  steamDirs=($(cat ~/.steam/steam/steamapps/libraryfolders.vdf | grep "path" | awk '{ print $2  }' | sed s/\"//g))
+  if [ -f ~/.steam/steam/steamapps/libraryfolders.vdf ]; then
+    steamDirs=($(cat ~/.steam/steam/steamapps/libraryfolders.vdf | grep "path" | awk '{ print $2  }' | sed s/\"//g))
+  fi
   steamDirs=("${steamDirs[@]}" "$HOME/.steam/steam")
   for checkDir in "${steamDirs[@]}"; do
     if [ -d "${checkDir}/steamapps/compatdata/39210/pfx" ]; then ffxivDir="${checkDir}"; fi
