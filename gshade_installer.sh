@@ -2,9 +2,7 @@
 
 ###
 # TODO:
-# Mac compatibility (low priority until proven working)
-# - Replace cp with rsync
-#
+# - Don't break anything.
 
 ##
 # Housekeeping to respect user's configurations.
@@ -72,7 +70,18 @@ shopt -s extglob
 #				$0 git|gitUpdate			-- Downloads / updates related git repos.  Check gitUpdate() for more info.
 ##
 printHelp() {
-  printf "Syntax options:\n\t\t\t\t%s\t\t\t\t\t\t-- Guided tutorial.\n\t\t\t\t%s update [force|presets]\t\t\t-- Install / Update to latest GShade.  Optionally force the full update or just presets.\n\t\t\t\t%s list\t\t\t\t\t-- List games, numbers provided are for use with remove / delete options.\n\t\t\t\t%s lang <en|ja|ko|de|fr|it> [default|#]\t-- Change the language of GShade's interface.  Defaults to the master copy if unspecified.\n\t\t\t\t%s remove <#>\t\t\t\t-- Remove <#> from database, leave GShade in whatever shape it's currently in.\n\t\t\t\t%s delete <#>\t\t\t\t-- Delete GShade from <#> and remove from database.\n<WINEPREFIX=/path/to/prefix>\t%s ffxiv\t\t\t\t\t-- Install to FFXIV in provided Wine Prefix or autodetect if no Wine Prefix.\n WINEPREFIX=/path/to/prefix\t%s [dx(?)|opengl] /path/to/game.exe\t\t-- Install to custom location with designated graphical API version. 'dxgi' is valid here.\n\n\t\t\t\t\t\t\t\t\tNote: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!\n" "$0" "$0" "$0" "$0" "$0" "$0" "$0" "$0"
+  helpText="Syntax options:
+				%s						-- Guided tutorial.
+				%s update [force\|presets]			-- Install / Update to latest GShade.  Optionally force the full update or just presets.
+				%s list					-- List games, numbers provided are for use with remove / delete options.
+				%s lang <en|ja|ko|de|fr|it> [default|#]	-- Change the language of GShade's interface.  Defaults to the master copy if unspecified.
+				%s remove <#>				-- Remove <#> from database, leave GShade in whatever shape it's currently in.
+				%s delete <#>				-- Delete GShade from <#> and remove from database.
+<WINEPREFIX=/path/to/prefix>	%s ffxiv					-- Install to FFXIV in provided Wine Prefix or autodetect if no Wine Prefix.
+ WINEPREFIX=/path/to/prefix	%s [dx(?)|opengl] /path/to/game.exe		-- Install to custom location with designated graphical API version. 'dxgi' is valid here.
+
+									Note: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!\n"
+  printf "$helpText" "$0" "$0" "$0" "$0" "$0" "$0" "$0" "$0"
 }
 
 ##
@@ -330,7 +339,7 @@ presetUpdate() {
 
 ##
 # Updater / initial installer.
-# Certain things ONLY happen during initial installation ATM.  The $GShadeHome directory is created, GShade Converter.exe is downloaded, games.db is created, the d3dcompiler_47.dlls (32 and 64-bit) are both downloaded and put in their own directory.
+# Certain things ONLY happen during initial installation ATM.  The $GShadeHome directory is created, games.db is created, the d3dcompiler_47.dlls (32 and 64-bit) are both downloaded and put in their own directory.
 update() {
   if [ ! -d "$GShadeHome" ]; then
     if (yesNo "GShade initial install not found, would you like to create it?  "); then printf "\nCreating...  "; else printf "\nAborting installation.\n"; exit 1; fi
@@ -723,7 +732,19 @@ customGame() {
 ##
 # Sometimes the menu should get repeated, sometimes not.  Easiest to call a function for it.
 menu() {
-  printf "Welcome to GShade!  Please select an option:\n\t1) Check for an update to GShade\n\t2) Install to a custom game\n\tP) Update presets\n\tF) Attempt auto-install for FFXIV\n\tB) Create a backup of existing GShade game installations\n\tS) Show games GShade is installed to\n\tL) Change GShade's language\n\tR) Remove game from installed games list\n\tD) Delete GShade from game and remove from list\n\t0) Redownload compilers\n\tQ) Quit\n"
+  printf "Welcome to GShade!  Please select an option:
+	1) Check for an update to GShade
+	2) Install to a custom game
+	P) Update presets
+	F) Attempt auto-install for FFXIV
+	B) Create a backup of existing GShade game installations
+	S) Show games GShade is installed to
+	L) Change GShade's language
+	R) Remove game from installed games list
+	D) Delete GShade from game and remove from list
+	0) Redownload compilers
+	Q) Quit
+"
 }
 
 ##
@@ -818,19 +839,23 @@ debugInfo(){
   fi
   pushd "$GShadeHome" > /dev/null || exit
   printf "Checking md5sums..."
-  md3d32=$(md5sum "d3dcompiler_47s/d3dcompiler_47.dll.32bit")
+  md3d32=$(getMD5 "d3dcompiler_47s/d3dcompiler_47.dll.32bit")
   ##
   # Alert if legacy md5sum.  This is my own fault and may just get changed back to the new md5sum at some point.
-  if [ "$md3d32" == "eee83660394f290e3ea5faac41c23a70  d3dcompiler_47s/d3dcompiler_47.dll.32bit" ]; then
+  if [ "$md3d32" == "eee83660394f290e3ea5faac41c23a70" ]; then
     PS=0
-  elif [ "$md3d32" == "c971cde5194dd761456214dd5365bdc7  d3dcompiler_47s/d3dcompiler_47.dll.32bit" ]; then
+  elif [ "$md3d32" == "c971cde5194dd761456214dd5365bdc7" ]; then
     PS=2
   else
     PS=1
   fi
-  md5sum --status --ignore-missing -c <<<"b0ae3aa9dd1ebd60bdf51cb94834cd04 d3dcompiler_47s/d3dcompiler_47.dll.64bit"
+  if [ "$(getMD5 d3dcompiler_47s/d3dcompiler_47.dll.64bit)" == "b0ae3aa9dd1ebd60bdf51cb94834cd04" ]; then true; else false; fi
   N64=$?
-  output=$(printf "%b" "\e[2K\rInstallation location:\t${GShadeHome/#$HOME/"\$HOME"}/\nInstallation version:\t$(cat "$GShadeHome"/version)\nd3dcompiler_47 32-bit:\t$([ "$PS" -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")\e[0m$([ "$PS" -eq 2 ] && printf "%b" " \e[33mLegacy file -- please run '$0 fetchCompilers'!\e[0m")\nd3dcompiler_47 64-bit:\t$([ $N64 -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")\e[0m\nWine version:\t\t$($( command -v wine >/dev/null 2>&1 -eq 0 ) && printf "%b" "\e[32m$(wine --version)\e[0m" || printf "\e[31mNot installed\e[0m")")
+  output=$(printf "%b" "\e[2K\rInstallation location:\t${GShadeHome/#$HOME/"\$HOME"}/
+Installation version:\t$(cat "$GShadeHome"/version)
+$([ "$IS_MAC" = true ] && printf "%b" "Environment:\t\t\e[33mMac OS detected" || printf "d3dcompiler_47 32-bit:\t$([ "$PS" -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")$([ "$PS" -eq 2 ] && printf "%b" " \e[33mLegacy file -- please run '$0 fetchCompilers'!")")\e[0m
+d3dcompiler_47 64-bit:	$([ "$N64" -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")\e[0m
+Wine version:		$($( command -v wine >/dev/null 2>&1 -eq 0 ) && printf "%b" "\e[32m$(wine --version)\e[0m" || printf "\e[31mNot installed\e[0m")")
   listGames; [ $? ] && output+=$(printf "\ngames.db:\n%b" "${gamesList/#$HOME/"\$HOME"}") || output+=$(printf "\ngames.db:\tEmpty or does not currently exist.")
   popd > /dev/null || exit
   if [ "$1" != "upload" ]; then
