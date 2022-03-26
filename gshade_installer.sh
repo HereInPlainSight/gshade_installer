@@ -44,6 +44,17 @@ if [[ $OSTYPE == 'darwin'* ]]; then
   fi
 fi
 
+##
+# Steam Deck's out and uses flatpak wine, so... time to get compatible.  As far as I know, Macs do not use flatpaks.
+if [[ "$IS_MAC" = "false" ]] && ( ! hash "$wineBin" &>/dev/null ); then
+  if ( flatpak list --app 2> /dev/null | grep -i org.winehq.Wine &> /dev/null ); then
+    wineBin="flatpak run org.winehq.Wine"
+  else
+    printf "No wine found at all -- not even flatpak!  Exiting!\n"
+    exit 1
+  fi
+fi
+
 declare -a iniSettings=()
 
 ##
@@ -72,7 +83,7 @@ shopt -s extglob
 printHelp() {
   helpText="Syntax options:
 				%s						-- Guided tutorial.
-				%s update [force\|presets]			-- Install / Update to latest GShade.  Optionally force the full update or just presets.
+				%s update [force|presets]			-- Install / Update to latest GShade.  Optionally force the full update or just presets.
 				%s list					-- List games, numbers provided are for use with remove / delete options.
 				%s lang <en|ja|ko|de|fr|it> [default|#]	-- Change the language of GShade's interface.  Defaults to the master copy if unspecified.
 				%s remove <#>				-- Remove <#> from database, leave GShade in whatever shape it's currently in.
@@ -208,7 +219,7 @@ fetchCompilers() {
     else
       printf "\e[2K\rDownloading 32-bit compiler...  "
   ##    curl -sO http://dege.freeweb.hu/dgVoodoo2/D3DCompiler_47.zip && unzip -q D3DCompiler_47.zip && rm D3DCompiler_47.zip
-      curl -sO https://download-installer.cdn.mozilla.net/pub/firefox/releases/62.0.3/win32/ach/Firefox%20Setup%2062.0.3.exe && 7z e -y "Firefox%20Setup%2062.0.3.exe" "core/d3dcompiler_47.dll" >> /dev/null && rm "Firefox%20Setup%2062.0.3.exe"
+      curl -sO https://download-installer.cdn.mozilla.net/pub/firefox/releases/62.0.3/win32/ach/Firefox%20Setup%2062.0.3.exe && if [ -d "7z" ]; then sevenZ="7z/bin/7z"; else sevenZ="7z"; fi; $sevenZ e -y "Firefox%20Setup%2062.0.3.exe" "core/d3dcompiler_47.dll" >> /dev/null && rm "Firefox%20Setup%2062.0.3.exe"
       mv d3dcompiler_47.dll d3dcompiler_47.dll.32bit
       printf "Done!"
     fi
@@ -346,16 +357,34 @@ update() {
     if [ "$IS_MAC" = true ] ; then
       prereqs=(awk find ln md5 sed unzip ditto curl perl)
     else
-      prereqs=(7z awk find ln md5sum sed unzip curl perl wine)
+      prereqs=(7z awk find ln md5sum sed unzip curl perl)
     fi
     mia=""
     for i in "${prereqs[@]}"; do
       if ( ! hash "$i" &>/dev/null ); then
-        if [ "$i" = "wine" ] && [ -n "$wineLoc" ]; then continue; fi
         if [ -n "$mia" ]; then mia+=", $i"; else mia="$i"; fi
       fi
     done
-    if [ -n "$mia" ]; then
+    if [ "$mia" = "7z" ] && ( hash "ark" &>/dev/null ); then
+      if ( yesNo "7z not found -- would you like to download a binary copy of the 7zip extractor?  This should ONLY be used if your package manager does not offer 7zip, such as the Steam Deck!  " ); then
+        if [ ! -d "$GShadeHome/d3dcompiler_47s/7z" ]; then
+          mkdir -p "$GShadeHome/d3dcompiler_47s/7z"
+        fi
+        pushd "$GShadeHome/d3dcompiler_47s/7z" > /dev/null || exit
+        printf "\nWorking..."
+        zipVer="16.02"
+        curl -so "p7zip_${zipVer}_x86_linux-bin.tar.bz2" -L "https://sourceforge.net/projects/p7zip/files/p7zip/${zipVer}/p7zip_${zipVer}_x86_linux_bin.tar.bz2/download"
+        ark -b -a "p7zip_${zipVer}_x86_linux-bin.tar.bz2"
+        mv "p7zip_${zipVer}/bin" "p7zip_${zipVer}/DOC" ./
+        rm -r "p7zip_${zipVer}"*
+        popd > /dev/null || exit
+        printf "\r7z downloaded for script-only use!\n"
+        mia=""
+      else
+        printf "\n7z is required for installation -- please install 7zip via your package manager if available.\n"
+        exit 1
+      fi
+    elif [ -n "$mia" ]; then
       printf "The following necessary command(s) could not be found: %s\n", "$mia"
       exit 1
     fi
