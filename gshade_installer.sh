@@ -621,7 +621,7 @@ validPrefix() {
 }
 
 ##
-# Automatic install for FFXIV.  Offers to install any that it finds in the following order: WINEPREFIX, Steam, Lutris.
+# Automatic install for FFXIV.  Offers to install any that it finds in the following order: WINEPREFIX, Lutris, Steam.
 XIVinstall() {
   gameExe="ffxiv_dx11.exe"
   gapi=d3d11
@@ -701,9 +701,33 @@ XIVinstall() {
   if [ -d "${ffxivDir}/steamapps/common/FINAL FANTASY XIV Online/game/" ] && [ -d "${ffxivDir}/steamapps/compatdata/39210/pfx" ]; then
     WINEPREFIX="${ffxivDir}/steamapps/compatdata/39210/pfx"
     gameLoc="${ffxivDir}/steamapps/common/FINAL FANTASY XIV Online/game/"
+    ##
+    # Find the proton for XIV and, you know, try to use it for the brief wine registry adds.  Here there be dragons?
+    findProton=$(cat "${ffxivDir}/steamapps/compatdata/39210/version")
+    numRe='^[0-9]+$'
+    if [[ ${findProton::1} =~ $numRe ]]; then # True means it starts with a number -- it probably says 'Proton' or 'Proton-' at the beginning.
+      for checkDir in "${steamDirs[@]}"; do
+        if [ -d "${checkDir}/steamapps/common/Proton ${findProton%%-*}" ]; then
+          tempLoc="${checkDir}/steamapps/common/Proton ${findProton%%-*}"
+          if [ -d "$tempLoc/files/bin" ]; then wineLoc="$tempLoc/files/bin/"
+          elif [ -d "$tempLoc/dist/bin" ]; then wineLoc="$tempLoc/dist/bin/"
+          fi
+        fi
+        if [ -d "${checkDir}/compatibilitytools.d/Proton-$findProton" ]; then
+          tempLoc="${checkDir}/compatibilitytools.d/Proton-$findProton"
+          if [ -d "$tempLoc/files/bin" ]; then wineLoc="$tempLoc/files/bin/"
+          elif [ -d "$tempLoc/dist/bin" ]; then wineLoc="$tempLoc/dist/bin/"
+          fi
+        fi
+      done
+    else
+      for checkDir in "${steamDirs[@]}"; do
+        if [ -d "${checkDir}/compatibilitytools.d/$findProton/files/bin/" ]; then wineLoc="${checkDir}/compatibilitytools.d/$findProton/files/bin/"; fi
+      done
+    fi
     printf "\nSteam install found!\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
     if (yesNo "Install? "); then
-        if ( ! yesNo "Use $gapi instead of dxgi?  If you are having issues with GShade when using other overlays (Steam or Discord, for instance), you may wish to try dxgi mode instead." ); then gapi=dxgi; fi
+      if ( ! yesNo "Use $gapi instead of dxgi?  If you are having issues with GShade when using other overlays (Steam or Discord, for instance), you may wish to try dxgi mode instead." ); then gapi=dxgi; fi
       printf "\nInstalling...  "
       installGame
       printf "Complete!\n"
