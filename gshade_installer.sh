@@ -392,7 +392,7 @@ update() {
     fetchCompilers
   fi
   gshadeCurrent=$(curl --silent "https://api.github.com/repos/Mortalitas/GShade/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-  if [ "$forceUpdate" -eq 0 ] && [[ -f "$GShadeHome/version" ]] && [[ $(<"$GShadeHome/version") == "$gshadeCurrent" ]]; then
+  if [ "$forceUpdate" -eq 0 ] && [[ -f "$GShadeHome/version" ]] && [[ $(<"$GShadeHome/version") == "$gshadeCurrent" ]] && [[ -f "$GShadeHome/GShade64.dll" ]]; then
     printf "Up to date.\n"
   else
     pushd "$GShadeHome" > /dev/null || exit
@@ -906,15 +906,15 @@ debugInfo(){
   N64=$?
   output=$(printf "%b" "\e[2K\rInstallation location:\t${GShadeHome/#$HOME/"\$HOME"}/
 Installation version:\t$(cat "$GShadeHome"/version)
-$([ "$IS_MAC" = true ] && printf "%b" "Environment:\t\t\e[33mMac OS detected" || printf "d3dcompiler_47 32-bit:\t$([ "$PS" -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")$([ "$PS" -eq 2 ] && printf "%b" " \e[33mLegacy file -- please run '$0 fetchCompilers'!")")\e[0m
-d3dcompiler_47 64-bit:	$([ "$N64" -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")\e[0m
+$([ "$IS_MAC" = true ] && printf "%b" "Environment:\t\t\e[33mMac OS detected" || printf "d3dcompiler_47 32-bit:\t$([ "$PS" -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")$([ "$PS" -eq 2 ] && printf "%50s" " \e[33mLegacy file -- please run 'fetchCompilers'!") "%15s"\e[0m "GShade32.dll:" $([ -f "$GShadeHome"/GShade32.dll ] && printf "\e[32mExists" || printf "%b" "\e[31mMIA")")\e[0m
+d3dcompiler_47 64-bit:	$([ "$N64" -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")                \e[0m "GShade64.dll:" $([ -f "$GShadeHome"/GShade64.dll ] && printf "\e[32mExists" || printf "\e[31mMIA")\e[0m
 Wine version:		$($( command -v wine >/dev/null 2>&1 -eq 0 ) && printf "%b" "\e[32m$(wine --version)\e[0m" || printf "\e[31mNot installed\e[0m")")
   listGames; [ $? ] && output+=$(printf "\ngames.db:\n%b" "${gamesList/#$HOME/"\$HOME"}") || output+=$(printf "\ngames.db:\tEmpty or does not currently exist.")
   popd > /dev/null || exit
   if [ "$1" != "upload" ]; then
     printf "%s\n" "$output"
   else
-    uploadLoc=$(printf "%s" "$output" | (exec 3<>/dev/tcp/termbin.com/9999; cat >&3; cat <&3; exec 3<&-))
+    uploadLoc=$(printf "%s\n" "$output" | (exec 3<>/dev/tcp/termbin.com/9999; cat >&3; cat <&3; exec 3<&-))
     printf "%s\n" "$uploadLoc"
   fi
   exit 0
