@@ -624,7 +624,7 @@ validPrefix() {
 # Automatic install for FFXIV.  Offers to install any that it finds in the following order: WINEPREFIX, Lutris, Steam.
 XIVinstall() {
   gameExe="ffxiv_dx11.exe"
-  gapi=d3d11
+  gapi=dxgi
   ARCH=64
 
   ##
@@ -660,9 +660,9 @@ XIVinstall() {
         exit 1
       fi
     else
-      printf "\nWine install found!\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
+      printf "\nWine install found!\n\tAPI hook: dxgi\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
       if (yesNo "Install? "); then
-        if ( ! yesNo "Use $gapi instead of dxgi?  If you are having issues with GShade when using other overlays (Steam or Discord, for instance), you may wish to try dxgi mode instead." ); then gapi=dxgi; fi
+        if ( ! yesNo "Install with dxgi?  You should ONLY say 'no' here if you're having issues with GShade! " ); then gapi=d3d11; fi
         printf "\nInstalling...  ";
         installGame
         printf "Complete!\n"
@@ -680,7 +680,7 @@ XIVinstall() {
       if [ ! -d "$gameLoc" ]; then
         gameLoc=$(find -L "$WINEPREFIX/drive_c" -name 'ffxiv_dx11.exe' -exec dirname {} ';')
       fi
-      printf "\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
+      printf "\n\tAPI hook: dxgi\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
       if (yesNo "Install? "); then
         printf "\nInstalling...  "
         installGame
@@ -712,22 +712,21 @@ XIVinstall() {
           if [ -d "$tempLoc/files/bin" ]; then wineLoc="$tempLoc/files/bin/"
           elif [ -d "$tempLoc/dist/bin" ]; then wineLoc="$tempLoc/dist/bin/"
           fi
-        fi
-        if [ -d "${checkDir}/compatibilitytools.d/Proton-$findProton" ]; then
+        elif [ -d "${checkDir}/compatibilitytools.d/Proton-$findProton" ]; then
           tempLoc="${checkDir}/compatibilitytools.d/Proton-$findProton"
           if [ -d "$tempLoc/files/bin" ]; then wineLoc="$tempLoc/files/bin/"
           elif [ -d "$tempLoc/dist/bin" ]; then wineLoc="$tempLoc/dist/bin/"
           fi
         fi
       done
-    else
+    else				# ... But if it DOESN'T start with a number, it's DEFINITELY not an official proton version, so limit our search.
       for checkDir in "${steamDirs[@]}"; do
         if [ -d "${checkDir}/compatibilitytools.d/$findProton/files/bin/" ]; then wineLoc="${checkDir}/compatibilitytools.d/$findProton/files/bin/"; fi
       done
     fi
-    printf "\nSteam install found!\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
+    printf "\nSteam install found!\n\tAPI hook: dxgi\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
     if (yesNo "Install? "); then
-      if ( ! yesNo "Use $gapi instead of dxgi?  If you are having issues with GShade when using other overlays (Steam or Discord, for instance), you may wish to try dxgi mode instead." ); then gapi=dxgi; fi
+      if ( ! yesNo "Install with dxgi?  You should ONLY say 'no' here if you're having issues with GShade! " ); then gapi=d3d11; fi
       printf "\nInstalling...  "
       installGame
       printf "Complete!\n"
@@ -739,18 +738,20 @@ XIVinstall() {
 ##
 # Walkthrough for custom game option selected from the general menu.  Gets input for $gapi, $WINEPREFIX, $gameExe, and $exeFile (which is really $fullPathToExeFile).
 customGamePrompt() {
-  while true; do
-    read -p "What graphics API is the game using? (opengl,dx9,dx10,dx11,dx12): " -r input
-    case $input in
-      opengl | gl) gapi=opengl32; break;;
-      dx9  | 9  ) gapi=d3d9;  break;;
-      dx10 | 10 ) gapi=d3d10; break;;
-      dx11 | 11 ) gapi=d3d11; break;;
-      dx12 | 12 ) gapi=d3d12; break;;
-      dxgi | gi ) gapi=dxgi; break;;
-      * ) printf "Invalid option.\n";;
-    esac
-  done
+  if ( yesNo "Install with dxgi?  You should ONLY say 'no' here if you're having issues with GShade! " ); then gapi=dxgi; else
+    while true; do
+      read -p "What graphics API is the game using? (opengl,dx9,dx10,dx11,dx12): " -r input
+      case $input in
+        opengl | gl) gapi=opengl32; break;;
+        dx9  | 9  ) gapi=d3d9;  break;;
+        dx10 | 10 ) gapi=d3d10; break;;
+        dx11 | 11 ) gapi=d3d11; break;;
+        dx12 | 12 ) gapi=d3d12; break;;
+        dxgi | gi ) gapi=dxgi; break;;
+        * ) printf "Invalid option.\n";;
+      esac
+    done
+  fi
   while ! { [ -d "$WINEPREFIX" ] && ( validPrefix ); }; do
     read -p "Where is the WINEPREFIX located?  (The directory where your drive_c folder is located): " WINEPREFIX
     if [ ! -d "$WINEPREFIX" ]; then printf "%s: Directory does not exist.\n" "$WINEPREFIX";
@@ -762,7 +763,6 @@ customGamePrompt() {
     if [ ! -f "$exeFile" ]; then printf "%s: Not a file, please confirm the path and file name.\n" "$exeFile";
     elif [ "${gameExe##*.}" != "exe" ]; then printf "%s: Not a .exe file." "$gameExe"; fi
   done
-  if ( [ $gapi != "dxgi" ] && ! yesNo "Use $gapi instead of dxgi?  If you are having issues with GShade when using other overlays (Steam or Discord, for instance), you may wish to try dxgi mode instead. (y/n) " ) then printf "\n"; gapi="dxgi"; else printf "\n"; fi
 }
 
 # Determines $ARCH and $gameLoc from $exeFile.
