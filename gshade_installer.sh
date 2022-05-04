@@ -140,6 +140,13 @@ wineGetUnixFilename() {
   else
     if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
     readlinkf "$(wine cmd /C "${1:0:2} & cd ${1:3} & winepath -u ./" 2>&1 | tail -1)" #black eorn magic
+    	# Proud as I am of the above attribution -- deobfuscation follows.  The above is largely parameter expansion with a bit of wine trickery:
+        # 'wine cmd /C'    - Asks wine to run the following command in the 'windows' shell.
+        # Presuming an argument was passed of "C:\Program Files(x86)\SquareEnix\":
+        # ${1:0:2}         - Parameter expansion: Take the argument's first character (at position 0) and give back two characters starting from there. 'C:'.  We changed drives if necessary.
+        # cd ${1:3}        - Parameter expansion: Take the argument from position 3 ('\', non-inclusive) all the way to the end. 'Program Files(x86)\SquareEnix\'.  We changed directories within the windows shell.
+        # winepath -u ./   - Ask wine's *internal* winepath to return the *nix path of the currect directory in the windows shell.
+        # tail -1          - Ignore all the other output from the script -- just take the last line with the *nix path and feed it to readlinkf for an absolute path.
   fi
 }
 
@@ -191,8 +198,8 @@ gitUpdate() {
             printf "Game:\t\t%s\t -- GIT INSTALLATION\nInstalled to:\t%s\nWINEPREFIX:\t%s\n" "$gameName" "$installDir" "$prefixDir" > "$backupDir/gameInfo.txt"
             cp "$installDir/GShade.ini" "$gameBackupDir/"
             rsync -a "$installDir/gshade-presets/" "$gameBackupDir/"
-	  fi
-	  rsync -a "GShade-Presets/" "$installDir/gshade-presets/"
+          fi
+          rsync -a "GShade-Presets/" "$installDir/gshade-presets/"
         fi
       done < "$dbFile"
     fi
@@ -405,19 +412,19 @@ update() {
       mv "reshade-shaders" "gshade-shaders"
       listGames;
       if [ $? ]; then
-	while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
-	  pushd "$installDir" > /dev/null || exit
-	  mv "reshade-presets" "gshade-presets"
-	  sed -i "s/reshade-/gshade-/" "GShade.ini"
-	  rshade=$(find '.' -maxdepth 1 -name "reshade-shaders" -lname "$GShadeHome/reshade-shaders" -exec basename {} ';')
-	  if [ -z "$rshade" ]; then
-	    mv "reshade-shaders" "gshade-shaders"
-	  else
-	    find '.' -maxdepth 1 -lname "$GShadeHome/reshade-shaders" -delete
-	    ln -sfn "$GShadeHome/gshade-shaders" "gshade-shaders"
-	  fi
-	  popd > /dev/null || exit
-	done < "$dbFile"
+        while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
+          pushd "$installDir" > /dev/null || exit
+          mv "reshade-presets" "gshade-presets"
+          sed -i "s/reshade-/gshade-/" "GShade.ini"
+          rshade=$(find '.' -maxdepth 1 -name "reshade-shaders" -lname "$GShadeHome/reshade-shaders" -exec basename {} ';')
+          if [ -z "$rshade" ]; then
+            mv "reshade-shaders" "gshade-shaders"
+          else
+            find '.' -maxdepth 1 -lname "$GShadeHome/reshade-shaders" -delete
+            ln -sfn "$GShadeHome/gshade-shaders" "gshade-shaders"
+          fi
+          popd > /dev/null || exit
+        done < "$dbFile"
       fi
     fi
     presetUpdate
@@ -512,10 +519,10 @@ recordGame() {
 # Pulls the relevant variables for a game based on line number from games.db.
 getGame() {
   [ -z "$1" ] && return 1 || line="$1"
-  OldIFS="$IFS"
+  oldIFS="$IFS"
   IFS='=;'
   set -- "$(awk -F '=;' 'NR=='"$line"' {print $1, $2, $3, $4}' "$HOME/.local/share/GShade/games.db")"
-  IFS="$OldIFS"
+  IFS="$oldIFS"
   gameExe=$1 gameLoc=$2 WINEPREFIX=$3 git=$4
 }
 
@@ -646,11 +653,11 @@ XIVinstall() {
         gameLoc="$(wineGetUnixFilename "$squareEnixLoc\\FINAL FANTASY XIV - A Realm Reborn\\game\\")"
       else
         # Failing that, check for a Wine Steam install.
-	steamLoc="$($wine reg query "HKLM\\Software\\Valve\\Steam" /v InstallPath 2>/dev/null | grep InstallPath | sed -E 's/^\s+InstallPath\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
+        steamLoc="$($wine reg query "HKLM\\Software\\Valve\\Steam" /v InstallPath 2>/dev/null | grep InstallPath | sed -E 's/^\s+InstallPath\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
 
-	if [ -n "$steamLoc" ]; then
-	  gameLoc="$(wineGetUnixFilename "$steamLoc")/steamapps/common/FINAL FANTASY XIV Online/game/"
-	fi
+        if [ -n "$steamLoc" ]; then
+          gameLoc="$(wineGetUnixFilename "$steamLoc")/steamapps/common/FINAL FANTASY XIV Online/game/"
+        fi
       fi
     fi
 
@@ -723,6 +730,17 @@ XIVinstall() {
       for checkDir in "${steamDirs[@]}"; do
         if [ -d "${checkDir}/compatibilitytools.d/$findProton/files/bin/" ]; then wineLoc="${checkDir}/compatibilitytools.d/$findProton/files/bin/"; fi
       done
+    fi
+    if [ -f "$WINEPREFIX/drive_c/users/steamuser/AppData/Roaming/XIVLauncher/launcherConfigV3.json" ]; then
+      launchersDir="$(awk -F': ' '/  "GamePath":/{print $2}' "$WINEPREFIX/drive_c/users/steamuser/AppData/Roaming/XIVLauncher/launcherConfigV3.json" | sed -e 's:\\:/:g' -e 's://:/:g' -e 's:,*\r*$::' -e 's/"//g' -e 's/^C:/drive_c/g')"
+      # In the efforts of de-obfuscation, XIVLauncher's json formatting looks like this after awking: "C:\\Program Files (x86)\\SquareEnix\\FINAL FANTASY XIV - A Realm Reborn",
+      # `sed -e 's:\\:/:g' -e 's://:/:g' -e 's:,*\r*$::' -e 's/"//g' -e 's/^C:/drive_c/g'` is, in order:
+      #   's:\\:/:g'        - switch slashes
+      #   's://:/:g'        - combine double slashes
+      #   's:,*\r*$::'      - remove trailing comma
+      #   's/"//g'          - remove quotes
+      #   's/^C:/drive_c/g' - replace 'C:' with 'drive_c'.
+      if [ -d "$WINEPREFIX/$launchersDir/game" ]; then gameLoc="$WINEPREFIX/$launchersDir/game"; fi
     fi
     printf "\nSteam install found!\n\tAPI hook: dxgi\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
     if (yesNo "Install? "); then
@@ -821,49 +839,49 @@ stepByStep() {
           removeGame $selection
         else
           printf "\nNo games yet installed to remove.\n"
-	fi
-	menu;;
+        fi
+        menu;;
       [Dd]* ) listGames  # Delete from game / list
         if [ $? ]; then
           printf "%b" "\n$gamesList"
           readNumber; selection=$?
           deleteGame $selection
-	else
-	  printf "\nNo games yet installed to remove.\n"
+        else
+          printf "\nNo games yet installed to remove.\n"
         fi
-	menu;;
+        menu;;
       [Ll]* ) listGames  # Change GShade's language in game.
         if [ $? ]; then
-	  printf "%b" "\n0) Default GShade.ini (for future installations)\n$gamesList"
-	  readNumber; selection=$?
-	  if [ $selection -eq 0 ]; then
-	    gameLoc="$GShadeHome"
-	  else
-  	    getGame $selection
-	  fi
-	  if [ ! -f "$gameLoc/GShade.ini" ]; then
-	    printf "\nNo GShade.ini found.  Please confirm GShade is working within this install.\n"
-	  else
-	    read -p "Please choose a language (en, ja, ko, de, fr, it): " -n 2 -r langIn
-	    lang="$(echo "$langIn" | tr '[:upper:]' '[:lower:]')"
+          printf "%b" "\n0) Default GShade.ini (for future installations)\n$gamesList"
+          readNumber; selection=$?
+          if [ $selection -eq 0 ]; then
+            gameLoc="$GShadeHome"
+          else
+            getGame $selection
+          fi
+          if [ ! -f "$gameLoc/GShade.ini" ]; then
+            printf "\nNo GShade.ini found.  Please confirm GShade is working within this install.\n"
+          else
+            read -p "Please choose a language (en, ja, ko, de, fr, it): " -n 2 -r langIn
+            lang="$(echo "$langIn" | tr '[:upper:]' '[:lower:]')"
             case $lang in
-	      en | ja | ko | de | fr | it) modifySettings "$gameLoc/GShade.ini" "Language" "$(updateLanguage "$lang")" "GENERAL"
-	        printf "\nUpdated!\n"
-	    	;;
-	      *) printf "Unknown language.  Please retry.";;
-	    esac
-	  fi
+              en | ja | ko | de | fr | it) modifySettings "$gameLoc/GShade.ini" "Language" "$(updateLanguage "$lang")" "GENERAL"
+                printf "\nUpdated!\n"
+                ;;
+              *) printf "Unknown language.  Please retry.";;
+            esac
+          fi
         else
-	  printf "\nUpdating default GShade.ini -- this will affect all future installs.\n"
-	  read -p "Please choose a language (en, ja, ko, de, fr, it): " -n 2 -r langIn
-	    lang="$(echo "$langIn" | tr '[:upper:]' '[:lower:]')"
+          printf "\nUpdating default GShade.ini -- this will affect all future installs.\n"
+          read -p "Please choose a language (en, ja, ko, de, fr, it): " -n 2 -r langIn
+            lang="$(echo "$langIn" | tr '[:upper:]' '[:lower:]')"
             case $lang in
-	      en | ja | ko | de | fr | it) modifySettings "$GShadeHome/GShade.ini" "Language" "$(updateLanguage "$lang")" "GENERAL"
-	        printf "\nUpdated!\n"
-	    	;;
-	      *) printf "Unknown language.  Please retry.";;
-	    esac
-	fi
+              en | ja | ko | de | fr | it) modifySettings "$GShadeHome/GShade.ini" "Language" "$(updateLanguage "$lang")" "GENERAL"
+                printf "\nUpdated!\n"
+                ;;
+              *) printf "Unknown language.  Please retry.";;
+            esac
+        fi
       forgetGame
       menu;;
       [0]* ) printf "\n"; fetchCompilers; menu;;
@@ -927,7 +945,7 @@ case $1 in
     case $2 in
       presets)
         presetUpdate
-	exit 0;;
+        exit 0;;
       force)
         forceUpdate=1;;
     esac
