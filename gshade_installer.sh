@@ -640,11 +640,12 @@ XIVinstall() {
   if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
 
   if ( validPrefix ); then
-    if [[ "$IS_MAC" = "true" ]] && [[ -d "$HOME/Library/Application Support/XIV on Mac/wineprefix" ]]; then
+    if [[ "$IS_MAC" = "true" ]] && [[ -d "/Applications/XIV on Mac.app" ]]; then
       WINEPREFIX="$HOME/Library/Application Support/XIV on Mac/wineprefix"
-      gameLoc="$HOME/Library/Application Support/XIV on Mac/ffxiv/game"
+      gameLoc="$(defaults read dezent.XIV-on-Mac GamePath)/game/"
       gapi=d3d11;
-      printf "If you have a MacBook Pro it's Fn+Shift+f2 to open the gshade window!"
+      printf "\n $gameLoc"
+      printf "\nIf you have a MacBook Pro it's Fn+Shift+f2 to open the gshade window!"
       printf "\nXIV on Mac detected.\n"
       printf "\nInstalling...  ";
       installGame
