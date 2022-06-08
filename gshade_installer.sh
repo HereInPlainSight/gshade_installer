@@ -657,7 +657,7 @@ XIVinstall() {
           if [[ -d "$HOME/Library/Application Support/XIV on Mac/wineprefix" ]]; then
             WINEPREFIX="$HOME/Library/Application Support/XIV on Mac/wineprefix"
             gameLoc="$HOME/Library/Application Support/XIV on Mac/ffxiv/game"
-            gappi=d3d11;
+            gapi=d3d11;
             printf "\nXIV on Mac detected.\n"
             printf "\nInstalling...  ";
             installGame
