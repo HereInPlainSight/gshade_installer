@@ -658,7 +658,7 @@ XIVinstall() {
             WINEPREFIX="$HOME/Library/Application Support/XIV on Mac/wineprefix"
             gameLoc="$HOME/Library/Application Support/XIV on Mac/ffxiv/game"
             gapi=d3d11;
-            printf "If you have a Macbook Pro it's Fn+Shift+f2 to open the gshade window!"
+            printf "If you have a MacBook Pro it's Fn+Shift+f2 to open the gshade window!"
             printf "\nXIV on Mac detected.\n"
             printf "\nInstalling...  ";
             installGame
