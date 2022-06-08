@@ -15,8 +15,6 @@ dbFile="$GShadeHome/games.db"
 
 ##
 # Yeah I think this'll make life easier.
-gameExe=""
-gameLoc=""
 gamesList=""
 gapi=""
 ARCH=""
@@ -496,7 +494,7 @@ listGames() {
     ((++i))
   done < "$dbFile"
   printf "\e[2K\r"
-  return 0 
+  return 0
 }
 
 ##
@@ -642,6 +640,18 @@ XIVinstall() {
   if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
 
   if ( validPrefix ); then
+    if [[ "$IS_MAC" = "true" ]] && [[ -d "$HOME/Library/Application Support/XIV on Mac/wineprefix" ]]; then
+      WINEPREFIX="$HOME/Library/Application Support/XIV on Mac/wineprefix"
+      gameLoc="$HOME/Library/Application Support/XIV on Mac/ffxiv/game"
+      gapi=d3d11;
+      printf "If you have a MacBook Pro it's Fn+Shift+f2 to open the gshade window!"
+      printf "\nXIV on Mac detected.\n"
+      printf "\nInstalling...  ";
+      installGame
+      printf "Complete!\n"
+      exit 0
+    fi
+
     gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
 
     ## Querying location from registry, ~/.wine checking, and Wine Steam install are all contributed by Maia-Everett.
@@ -1004,7 +1014,7 @@ case $1 in
   gitUpdate
   exit 0;;
   debug | status)
-  debugInfo "$2" 
+  debugInfo "$2"
   exit 0;;
   "")
   stepByStep
@@ -1029,4 +1039,3 @@ if [ "${gameExe##*.}" != "exe" ]; then printf "%s: Not a .exe file.\n" "$gameExe
 if [ -n "$3" ] && [ "$3" == "git" ] && [ -d "$GShadeHome/git/GShade-Presets" ]; then git=0; fi
 
 customGame
-
