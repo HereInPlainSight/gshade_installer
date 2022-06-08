@@ -15,8 +15,7 @@ dbFile="$GShadeHome/games.db"
 
 ##
 # Yeah I think this'll make life easier.
-gameExe=""
-gameLoc=""
+
 gamesList=""
 gapi=""
 ARCH=""
@@ -496,7 +495,7 @@ listGames() {
     ((++i))
   done < "$dbFile"
   printf "\e[2K\r"
-  return 0 
+  return 0
 }
 
 ##
@@ -629,10 +628,13 @@ validPrefix() {
 
 ##
 # Automatic install for FFXIV.  Offers to install any that it finds in the following order: WINEPREFIX, Lutris, Steam.
+
+
 XIVinstall() {
   gameExe="ffxiv_dx11.exe"
   gapi=dxgi
   ARCH=64
+
 
   ##
   # This will be relevant if it exists.
@@ -642,7 +644,7 @@ XIVinstall() {
   if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
 
   if ( validPrefix ); then
-    gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
+    # gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
 
     ## Querying location from registry, ~/.wine checking, and Wine Steam install are all contributed by Maia-Everett.
     if [ ! -d "$gameLoc" ]; then
@@ -651,7 +653,21 @@ XIVinstall() {
 
       if [ -n "$squareEnixLoc" ]; then
         gameLoc="$(wineGetUnixFilename "$squareEnixLoc\\FINAL FANTASY XIV - A Realm Reborn\\game\\")"
-      else
+        fi
+          if [[ -d "$HOME/Library/Application Support/XIV on Mac/wineprefix" ]]; then
+            WINEPREFIX="$HOME/Library/Application Support/XIV on Mac/wineprefix"
+            gameLoc="$HOME/Library/Application Support/XIV on Mac/ffxiv/game"
+            gapi=d3d11;
+            printf "If you have a MacBook Pro it's Fn+Shift+f2 to open the gshade window!"
+            printf "\nXIV on Mac detected.\n"
+            printf "\nInstalling...  ";
+            installGame
+            printf "Complete!\n"
+            exit 1
+          fi
+
+          printf "Complete!\n"
+        else
         # Failing that, check for a Wine Steam install.
         steamLoc="$($wine reg query "HKLM\\Software\\Valve\\Steam" /v InstallPath 2>/dev/null | grep InstallPath | sed -E 's/^\s+InstallPath\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
 
@@ -675,7 +691,7 @@ XIVinstall() {
         printf "Complete!\n"
       fi
     fi
-  fi
+
 
   if [[ -n "$lutrisYaml" ]] && [ -f "$lutrisYaml" ]; then
     if [ ${#lutrisYaml[@]} -gt 1 ]; then printf "\nFound %s Lutris installs!" "${#lutrisYaml[@]}"; else printf "\nLutris install found!"; fi
@@ -1004,7 +1020,7 @@ case $1 in
   gitUpdate
   exit 0;;
   debug | status)
-  debugInfo "$2" 
+  debugInfo "$2"
   exit 0;;
   "")
   stepByStep
@@ -1029,4 +1045,3 @@ if [ "${gameExe##*.}" != "exe" ]; then printf "%s: Not a .exe file.\n" "$gameExe
 if [ -n "$3" ] && [ "$3" == "git" ] && [ -d "$GShadeHome/git/GShade-Presets" ]; then git=0; fi
 
 customGame
-
