@@ -2,6 +2,8 @@
 
 This is a CLI [GShade](https://gposers.com/gshade/) installer for Linux.  It both downloads and updates GShade and can be used to install / update your GShade installs for individual games that will be run through WINE.
 
+Please note that as of 06-21-22, this installer no longer interacts with WINE directly, as it seems to no longer be necessary.  The previous script can be found in the `legacy` branch.
+
 ## Getting Started
 
 Once you've got the script and it's executable, you can simply run it.  There is a basic menu.
@@ -25,17 +27,15 @@ You can clone the repo and run the script from within it.  Instructions to do so
 ### Prerequisites
 
 Universally required:
-* `awk`, `curl`, `find`, `hash`, `ln`, `perl`, `sed`, `unzip`, `wine`<sup>1</sup>
+* `awk`, `curl`, `find`, `hash`, `ln`, `perl`, `sed`, `unzip`
 
 Additional requirements for Linux:
-* `7z`<sup>2</sup>, `md5sum`
+* `7z`<sup>1</sup>, `md5sum`
 
 Additional requirements for Mac:
 * `ditto`, `md5`
 
-<sup>1</sup> A local copy of WINE is required -- the version itself doesn't matter, but if you'll be using your local copy of WINE to ***play*** the game, you'll need 4.2 or above to get shaders to work.
-
-<sup>2</sup> As of 02-23-21, `7z` (generally provided by the `p7zip` package in most distros, `p7zip-full` on Ubuntu) is also required.  If you have a reliable source of the required 32-bit d3dcompiler that doesn't need it, I'm open to removing the requirement, but right now we're using the winetricks method.
+<sup>1</sup> As of 02-23-21, `7z` (generally provided by the `p7zip` package in most distros, `p7zip-full` on Ubuntu) is also required.  If you have a reliable source of the required 32-bit d3dcompiler that doesn't need it, I'm open to removing the requirement, but right now we're using the winetricks method.
 
 ### Installation
 

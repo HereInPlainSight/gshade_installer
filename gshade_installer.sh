@@ -19,8 +19,6 @@ gamesList=""
 gapi=""
 ARCH=""
 forceUpdate=0
-wineLoc=""
-wineBin="wine"
 
 ##
 # Checking if running on Mac
@@ -29,28 +27,6 @@ cxLoc="/Applications/CrossOver.app" #this should be identical on all macs
 if [[ $OSTYPE == 'darwin'* ]]; then
   IS_MAC=true
   printf "Running on macOS\n"
-  if ( ! hash wine64 &>/dev/null ); then
-    if [ -d "$cxLoc/Contents/SharedSupport/CrossOver/bin" ]; then
-      wineLoc="$cxLoc/Contents/SharedSupport/CrossOver/bin"
-      wineBin="wineloader64"
-    else
-      printf "Could not find a valid CrossOver install at: %s and wine is not installed\n", "$cxLoc"
-      exit 1
-    fi
-  else
-    wineBin="wine64"
-  fi
-fi
-
-##
-# Steam Deck's out and uses flatpak wine, so... time to get compatible.  As far as I know, Macs do not use flatpaks.
-if [[ "$IS_MAC" = "false" ]] && ( ! hash "$wineBin" &>/dev/null ); then
-  if ( flatpak list --app 2> /dev/null | grep -i org.winehq.Wine &> /dev/null ); then
-    wineBin="flatpak run org.winehq.Wine"
-  else
-    printf "No wine found at all -- not even flatpak!  Exiting!\n"
-    exit 1
-  fi
 fi
 
 declare -a iniSettings=()
@@ -129,24 +105,6 @@ getMD5() {
 ##
 # Workaround for platforms that don't ship with gnu readlink
 readlinkf(){ perl -MCwd -e 'print Cwd::abs_path shift' "$1";}
-
-##
-# Function to convert a wine path towards a *nix path
-wineGetUnixFilename() {
-  if ( hash winepath &>/dev/null ); then
-    winepath -u "$1" 2>/dev/null | tr -d '\r\n'
-  else
-    if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
-    readlinkf "$(wine cmd /C "${1:0:2} & cd ${1:3} & winepath -u ./" 2>&1 | tail -1)" #black eorn magic
-    	# Proud as I am of the above attribution -- deobfuscation follows.  The above is largely parameter expansion with a bit of wine trickery:
-        # 'wine cmd /C'    - Asks wine to run the following command in the 'windows' shell.
-        # Presuming an argument was passed of "C:\Program Files(x86)\SquareEnix\":
-        # ${1:0:2}         - Parameter expansion: Take the argument's first character (at position 0) and give back two characters starting from there. 'C:'.  We changed drives if necessary.
-        # cd ${1:3}        - Parameter expansion: Take the argument from position 3 ('\', non-inclusive) all the way to the end. 'Program Files(x86)\SquareEnix\'.  We changed directories within the windows shell.
-        # winepath -u ./   - Ask wine's *internal* winepath to return the *nix path of the currect directory in the windows shell.
-        # tail -1          - Ignore all the other output from the script -- just take the last line with the *nix path and feed it to readlinkf for an absolute path.
-  fi
-}
 
 ##
 # Backup GShade's gshade-shaders (and git shaders if they exist), as well as each games' gshade-presets/ and GShade.ini.
@@ -532,19 +490,6 @@ forgetGame() {
 }
 
 ##
-# Clean Wine and soft links pointing to $GShadeHome from the WINEPREFIX and current directory.
-cleanWineLinks() {
-  if ( validPrefix ); then
-    export WINEPREFIX
-    if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
-    $wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v d3dcompiler_47 /f > /dev/null 2>&1
-    oldGapi="$(basename "$(find '.' -maxdepth 1 -lname "$GShadeHome/GShade*.dll" -exec basename {} ';')" .dll)"
-    $wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${oldGapi}" /f > /dev/null 2>&1
-  fi
-  find "$gameLoc" -maxdepth 1 -lname "$GShadeHome/*" -delete > /dev/null 2>&1
-}
-
-##
 # Invocation: removeGame #
 # Removes line number # from $dbFile.
 removeGame() {
@@ -565,7 +510,6 @@ deleteGame() {
   fi
   pushd "$gameLoc" > /dev/null || exit
   rm -rf 'gshade-presets' 'GShade.ini'
-  cleanWineLinks
   popd > /dev/null || exit
   WINEPREFIX="$tempWINEPREFIX"
   removeGame "$1"
@@ -586,15 +530,10 @@ installGame() {
     exit 1
   fi
   # Clean up an old install before the new soft links and reg edits are re-added.  Mostly to deal with changing gapi's.
-  cleanWineLinks
   ln -sfn "$GShadeHome/d3dcompiler_47s/d3dcompiler_47.dll.${ARCH}bit" d3dcompiler_47.dll
   if [ $? != 0 ] || [ ! -L "d3dcompiler_47.dll" ]; then cp "$GShadeHome/d3dcompiler_47s/d3dcompiler_47.dll.${ARCH}bit" d3dcompiler_47.dll; fi
   ln -sfn "$GShadeHome/GShade${ARCH}.dll" "${gapi}".dll
   if [ $? != 0 ] || [ ! -L "${gapi}.dll" ]; then cp "$GShadeHome/GShade${ARCH}.dll" "$gapi".dll; fi
-  export WINEPREFIX
-  if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
-  $wine reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v d3dcompiler_47 /d native /f >/dev/null 2>&1
-  $wine reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${gapi}" /d native,builtin /f >/dev/null 2>&1
   if [ ! -f "GShade.ini" ]; then cp "$GShadeHome/GShade.ini" "GShade.ini"; fi
   ln -sfn "$GShadeHome/gshade-shaders" "gshade-shaders"
   if [ $? != 0 ] || [ ! -L "gshade-shaders" ]; then cp -a "$GShadeHome/gshade-shaders" "gshade-shaders"; fi
@@ -637,8 +576,6 @@ XIVinstall() {
   lutrisYaml=($(find "$XDG_CONFIG_HOME"/lutris/games/ -name 'final-fantasy-xiv*' -print 2>/dev/null))
 
   if [ -z "$WINEPREFIX" ]; then WINEPREFIX="$HOME/.wine"; fi
-  if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
-
   if ( validPrefix ); then
     if [[ "$IS_MAC" = "true" ]] && [[ -d "/Applications/XIV on Mac.app" ]]; then
       WINEPREFIX="$HOME/Library/Application Support/XIV on Mac/wineprefix"
@@ -654,23 +591,6 @@ XIVinstall() {
     fi
 
     gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
-
-    ## Querying location from registry, ~/.wine checking, and Wine Steam install are all contributed by Maia-Everett.
-    if [ ! -d "$gameLoc" ]; then
-      # Try to read game location from registry
-      squareEnixLoc="$($wine reg query 'HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\Uninstall\{2B41E132-07DF-4925-A3D3-F2D1765CCDFE}' /v InstallLocation 2>/dev/null | grep InstallLocation | sed -E 's/^\s+InstallLocation\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
-
-      if [ -n "$squareEnixLoc" ]; then
-        gameLoc="$(wineGetUnixFilename "$squareEnixLoc\\FINAL FANTASY XIV - A Realm Reborn\\game\\")"
-      else
-        # Failing that, check for a Wine Steam install.
-        steamLoc="$($wine reg query "HKLM\\Software\\Valve\\Steam" /v InstallPath 2>/dev/null | grep InstallPath | sed -E 's/^\s+InstallPath\s+REG_SZ\s+(.+)$/\1/' | tr -d '\r\n')"
-
-        if [ -n "$steamLoc" ]; then
-          gameLoc="$(wineGetUnixFilename "$steamLoc")/steamapps/common/FINAL FANTASY XIV Online/game/"
-        fi
-      fi
-    fi
 
     if [ ! -d "$gameLoc" ]; then
       if [ "$WINEPREFIX" != "$HOME/.wine" ]; then
@@ -692,8 +612,6 @@ XIVinstall() {
     if [ ${#lutrisYaml[@]} -gt 1 ]; then printf "\nFound %s Lutris installs!" "${#lutrisYaml[@]}"; else printf "\nLutris install found!"; fi
     for i in ${lutrisYaml[@]}; do
       WINEPREFIX="$(awk -F': ' '/ prefix:/{print $2}' "$i")"
-      winever="$(awk -F': ' '/ version:/{print $2}' "$i")"
-      if [ -n "$XDG_DATA_HOME/lutris/runners/wine/$winever" ]; then wineLoc="$XDG_DATA_HOME/lutris/runners/wine/$winever/bin/"; fi
       gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
       if [ ! -d "$gameLoc" ]; then
         gameLoc=$(find -L "$WINEPREFIX/drive_c" -name 'ffxiv_dx11.exe' -exec dirname {} ';')
@@ -719,29 +637,6 @@ XIVinstall() {
   if [ -d "${ffxivDir}/steamapps/common/FINAL FANTASY XIV Online/game/" ] && [ -d "${ffxivDir}/steamapps/compatdata/39210/pfx" ]; then
     WINEPREFIX="${ffxivDir}/steamapps/compatdata/39210/pfx"
     gameLoc="${ffxivDir}/steamapps/common/FINAL FANTASY XIV Online/game/"
-    ##
-    # Find the proton for XIV and, you know, try to use it for the brief wine registry adds.  Here there be dragons?
-    findProton=$(cat "${ffxivDir}/steamapps/compatdata/39210/version")
-    numRe='^[0-9]+$'
-    if [[ ${findProton::1} =~ $numRe ]]; then # True means it starts with a number -- it probably says 'Proton' or 'Proton-' at the beginning.
-      for checkDir in "${steamDirs[@]}"; do
-        if [ -d "${checkDir}/steamapps/common/Proton ${findProton%%-*}" ]; then
-          tempLoc="${checkDir}/steamapps/common/Proton ${findProton%%-*}"
-          if [ -d "$tempLoc/files/bin" ]; then wineLoc="$tempLoc/files/bin/"
-          elif [ -d "$tempLoc/dist/bin" ]; then wineLoc="$tempLoc/dist/bin/"
-          fi
-        elif [ -d "${checkDir}/compatibilitytools.d/Proton-$findProton" ]; then
-          tempLoc="${checkDir}/compatibilitytools.d/Proton-$findProton"
-          if [ -d "$tempLoc/files/bin" ]; then wineLoc="$tempLoc/files/bin/"
-          elif [ -d "$tempLoc/dist/bin" ]; then wineLoc="$tempLoc/dist/bin/"
-          fi
-        fi
-      done
-    else				# ... But if it DOESN'T start with a number, it's DEFINITELY not an official proton version, so limit our search.
-      for checkDir in "${steamDirs[@]}"; do
-        if [ -d "${checkDir}/compatibilitytools.d/$findProton/files/bin/" ]; then wineLoc="${checkDir}/compatibilitytools.d/$findProton/files/bin/"; fi
-      done
-    fi
     if [ -f "$WINEPREFIX/drive_c/users/steamuser/AppData/Roaming/XIVLauncher/launcherConfigV3.json" ]; then
       launchersDir="$(awk -F': ' '/  "GamePath":/{print $2}' "$WINEPREFIX/drive_c/users/steamuser/AppData/Roaming/XIVLauncher/launcherConfigV3.json" | sed -e 's:\\:/:g' -e 's://:/:g' -e 's:,*\r*$::' -e 's/"//g' -e 's/^C:/drive_c/g')"
       # In the efforts of de-obfuscation, XIVLauncher's json formatting looks like this after awking: "C:\\Program Files (x86)\\SquareEnix\\FINAL FANTASY XIV - A Realm Reborn",
@@ -936,8 +831,7 @@ debugInfo(){
   output=$(printf "%b" "\e[2K\rInstallation location:\t${GShadeHome/#$HOME/"\$HOME"}/
 Installation version:\t$(cat "$GShadeHome"/version)
 $([ "$IS_MAC" = true ] && printf "%b" "Environment:\t\t\e[33mMac OS detected" || printf "d3dcompiler_47 32-bit:\t$([ "$PS" -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")$([ "$PS" -eq 2 ] && printf "%50s" " \e[33mLegacy file -- please run 'fetchCompilers'!") "%15s"\e[0m "GShade32.dll:" $([ -f "$GShadeHome"/GShade32.dll ] && printf "\e[32mExists" || printf "%b" "\e[31mMIA")")\e[0m
-d3dcompiler_47 64-bit:	$([ "$N64" -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")                \e[0m "GShade64.dll:" $([ -f "$GShadeHome"/GShade64.dll ] && printf "\e[32mExists" || printf "\e[31mMIA")\e[0m
-Wine version:		$($( command -v wine >/dev/null 2>&1 -eq 0 ) && printf "%b" "\e[32m$(wine --version)\e[0m" || printf "\e[31mNot installed\e[0m")")
+d3dcompiler_47 64-bit:	$([ "$N64" -eq 0 ] && printf "\e[32mOK" || printf "%b" "\e[31mmd5sum failure")                \e[0m "GShade64.dll:" $([ -f "$GShadeHome"/GShade64.dll ] && printf "\e[32mExists" || printf "\e[31mMIA")\e[0m")
   listGames; [ $? ] && output+=$(printf "\ngames.db:\n%b" "${gamesList/#$HOME/"\$HOME"}") || output+=$(printf "\ngames.db:\tEmpty or does not currently exist.")
   popd > /dev/null || exit
   if [ "$1" != "upload" ]; then
