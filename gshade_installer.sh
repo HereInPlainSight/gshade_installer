@@ -489,6 +489,14 @@ forgetGame() {
   gameExe="" gameLoc="" WINEPREFIX="" git=1
 }
 
+cleanSoftLinks(){
+  if ( validPrefix ); then
+    export WINEPREFIX
+    oldGapi="$(basename "$(find '.' -maxdepth 1 -lname "$GShadeHome/GShade*.dll" -exec basename {} ';')" .dll)"
+  fi
+  find "$gameLoc" -maxdepth 1 -lname "$GShadeHome/*" -delete > /dev/null 2>&1
+}
+
 ##
 # Invocation: removeGame #
 # Removes line number # from $dbFile.
@@ -510,6 +518,7 @@ deleteGame() {
   fi
   pushd "$gameLoc" > /dev/null || exit
   rm -rf 'gshade-presets' 'GShade.ini'
+  cleanSoftLinks
   popd > /dev/null || exit
   WINEPREFIX="$tempWINEPREFIX"
   removeGame "$1"
@@ -530,6 +539,7 @@ installGame() {
     exit 1
   fi
   # Clean up an old install before the new soft links and reg edits are re-added.  Mostly to deal with changing gapi's.
+  cleanSoftLinks
   ln -sfn "$GShadeHome/d3dcompiler_47s/d3dcompiler_47.dll.${ARCH}bit" d3dcompiler_47.dll
   if [ $? != 0 ] || [ ! -L "d3dcompiler_47.dll" ]; then cp "$GShadeHome/d3dcompiler_47s/d3dcompiler_47.dll.${ARCH}bit" d3dcompiler_47.dll; fi
   ln -sfn "$GShadeHome/GShade${ARCH}.dll" "${gapi}".dll
