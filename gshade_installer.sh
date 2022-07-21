@@ -318,9 +318,9 @@ update() {
   if [ ! -d "$GShadeHome" ]; then
     if (yesNo "GShade initial install not found, would you like to create it?  "); then printf "\nCreating...  "; else printf "\nAborting installation.\n"; exit 1; fi
     if [ "$IS_MAC" = true ] ; then
-      prereqs=(awk find ln md5 sed unzip ditto curl perl)
+      prereqs=(awk find ln md5 sed unzip ditto curl perl rsync)
     else
-      prereqs=(7z awk find ln md5sum sed unzip curl perl)
+      prereqs=(7z awk find ln md5sum sed unzip curl perl rsync)
     fi
     mia=""
     for i in "${prereqs[@]}"; do
