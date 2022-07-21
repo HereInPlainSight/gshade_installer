@@ -27,7 +27,7 @@ You can clone the repo and run the script from within it.  Instructions to do so
 ### Prerequisites
 
 Universally required:
-* `awk`, `curl`, `find`, `hash`, `ln`, `perl`, `sed`, `unzip`
+* `awk`, `curl`, `find`, `hash`, `ln`, `perl`, `sed`, `unzip`, `rsync`
 
 Additional requirements for Linux:
 * `7z`<sup>1</sup>, `md5sum`
