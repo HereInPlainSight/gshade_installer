@@ -854,6 +854,12 @@ d3dcompiler_47 64-bit:	$([ "$N64" -eq 0 ] && printf "\e[32mOK" || printf "%b" "\
 }
 
 ##
+# First order of business!  Check to see if the initial GShade install is complete, and if not, update.
+if [ ! -d "$GShadeHome" ]; then
+  update
+fi
+
+##
 # Command line options:
 case $1 in
   update)
