@@ -584,6 +584,7 @@ XIVinstall() {
   ##
   # This will be relevant if it exists.
   lutrisYaml=($(find "$XDG_CONFIG_HOME"/lutris/games/ -name 'final-fantasy-xiv*' -print 2>/dev/null))
+  xlcoreini=($(find "$HOME"/.xlcore/ -name 'launcher.ini' -print 2>/dev/null))
 
   if [ -z "$WINEPREFIX" ]; then WINEPREFIX="$HOME/.wine"; fi
   if ( validPrefix ); then
@@ -626,6 +627,21 @@ XIVinstall() {
       if [ ! -d "$gameLoc" ]; then
         gameLoc=$(find -L "$WINEPREFIX/drive_c" -name 'ffxiv_dx11.exe' -exec dirname {} ';')
       fi
+      printf "\n\tAPI hook: dxgi\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
+      if (yesNo "Install? "); then
+        printf "\nInstalling...  "
+        installGame
+        printf "Complete!\n"
+      fi
+    done
+  fi
+
+#Locate install via XIVLauncher.Core
+  if [[ -n "$xlcoreini" ]] && [ -f "$xlcoreini" ]; then
+    printf "\nXLCore install found!"
+    for i in "${xlcoreini[@]}"; do
+      WINEPREFIX="$HOME/.xlcore/wineprefix/"
+      gameLoc="$(awk -F'=' '/GamePath=/{print $2}' $xlcoreini)/game/"
       printf "\n\tAPI hook: dxgi\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
       if (yesNo "Install? "); then
         printf "\nInstalling...  "
