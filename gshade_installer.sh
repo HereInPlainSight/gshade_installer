@@ -736,9 +736,9 @@ customGame() {
 # Sometimes the menu should get repeated, sometimes not.  Easiest to call a function for it.
 menu() {
   printf "Welcome to GShade!  Please select an option:
-	1) Check for an update to GShade
+	1) Update GShade and presets
 	2) Install to a custom game
-	P) Update presets
+	P) Update presets only
 	F) Attempt auto-install for FFXIV
 	B) Create a backup of existing GShade game installations
 	S) Show games GShade is installed to

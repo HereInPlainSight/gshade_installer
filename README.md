@@ -46,9 +46,13 @@ There's multiple ways to run the installer, this is just one method.
 
 We install to the `$XDG_DATA_HOME/GShade/` directory, which defaults to `$HOME/.local/share/GShade/`.
 
+### Updating
+
+When updating GShade through the script (`./gshade_installer.sh update` or through the guided menu's `1` option), *all* existing installs are updated if an update is found.
+
 #### ***If any of the following seems complicated -- just run `./gshade_installer.sh` and follow the guided prompts.***
 
-If you're installing GShade for use with FFXIV, you can try the auto-installer by running `./gshade_installer.sh ffxiv`, which will search for a default-location Steam install (the default WINE prefix in Steam is `$HOME/.steam/steam/steamapps/compatdata/39210/pfx`, and the game itself is in `$HOME/.steam/steam/steamapps/common/FINAL FANTASY XIV Online/game/`), a Lutris install (by looking for a configuration file), or by checking a provided WINEPREFIX.
+If you're installing GShade for use with FFXIV, you can try the auto-installer by running `./gshade_installer.sh ffxiv`, which will search for a default-location Steam install (the default WINE prefix in Steam is `$HOME/.steam/steam/steamapps/compatdata/39210/pfx`, and the game itself is in `$HOME/.steam/steam/steamapps/common/FINAL FANTASY XIV Online/game/`), a Lutris install (by looking for a configuration file), the default XLCore location, or by checking a provided WINEPREFIX.
 
 If you wanted to install GShade to a Steam install of FFXIV manually, you would use the following command:
 ```
