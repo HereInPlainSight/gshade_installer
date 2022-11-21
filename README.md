@@ -76,6 +76,10 @@ A: Known issue -- with the 32-bit launcher.
    - Steam: Open XIV's `properties` dialog and set your `Launch Options` to:
      - `echo "%command%" | sed 's/ffxivboot.exe/ffxivboot64.exe/' | sh`
 
+Q: I'm on a Mac --
+
+A: Anything Mac-related has been contributed by the good people at [XIV on Mac](https://www.xivmac.com/).  If your question is XIV-specific, you'll almost *certainly* want to contact them directly.
+
 ## Help
 
 If you need further help, please check the [GPoser's discord](https://discord.gg/gposers) for the `gshade-troubleshooting` channel.
@@ -86,7 +90,12 @@ If you need further help, please check the [GPoser's discord](https://discord.gg
 
 ## Contributors
 
+If you are a code contributor, please feel free to add yourself to the list during your commit!  My memory is roughly sieve-shaped!
+
 * [@JacoG-RH](https://github.com/JacoG-RH) - Non-standard Steam libraries.
 * [@Maia-Everett](https://github.com/Maia-Everett) - Support for Wine Steam, locating game via wine registry, and `$HOME/.wine` checking.
+* [@taylor85345](https://github.com/taylor85345) - XIVLauncher.Core auto-detection.
+* [@FleetAdmiralButter](https://github.com/FleetAdmiralButter) - Non-AVX detection.
 * [@marzent](https://github.com/marzent) - All the work to add Mac support.
+* [@Zoeyrae](https://github.com/Zoeyrae) - XIV on Mac support to the auto installer.
 

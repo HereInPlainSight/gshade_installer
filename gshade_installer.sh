@@ -540,20 +540,16 @@ installGame() {
   fi
   # Clean up an old install before the new soft links and reg edits are re-added.  Mostly to deal with changing gapi's.
   cleanSoftLinks
+  avx=""
+  # Check for AVX system flags and if they're missing, sort it out.
+  if ([ "$IS_MAC" = false ] && [ -z "$(cat /proc/cpuinfo | grep -m1 "^flags" | grep -i " avx ")" ]) || ([ "$IS_MAC" = true ] && [ -z "$(arch -x86_64 sysctl -a | grep machdep.cpu.features | grep AVX)" ]); then
+    avx="/Legacy (Non-AVX)"
+    printf "AVX CPU flag not detected.  Non-AVX DLLs will be linked.\n"
+  fi
   ln -sfn "$GShadeHome/d3dcompiler_47s/d3dcompiler_47.dll.${ARCH}bit" d3dcompiler_47.dll
   if [ $? != 0 ] || [ ! -L "d3dcompiler_47.dll" ]; then cp "$GShadeHome/d3dcompiler_47s/d3dcompiler_47.dll.${ARCH}bit" d3dcompiler_47.dll; fi
-  ln -sfn "$GShadeHome/GShade${ARCH}.dll" "${gapi}".dll
-  if [ $? != 0 ] || [ ! -L "${gapi}.dll" ]; then cp "$GShadeHome/GShade${ARCH}.dll" "$gapi".dll; fi
-  # Check to see if we're running under Rosetta.
-  # If we are, link the non-AVX DLLs as Rosetta does not support these instructions.
-  if [ "$IS_MAC" = true ] ; then
-    isRosetta=$(arch -x86_64 sysctl -a | grep machdep.cpu.features | grep AVX)
-    if [ -z "$isRosetta" ]; then
-      printf "Detected Rosetta on macOS. Non-AVX DLLs will be linked. "
-      ln -sfn "$GShadeHome/Legacy (Non-AVX)/GShade${ARCH}.dll" "${gapi}".dll
-      if [ $? != 0 ] || [ ! -L "${gapi}.dll" ]; then cp "$GShadeHome/Legacy (Non-AVX)/GShade${ARCH}.dll" "$gapi".dll; fi
-    fi
-  fi
+  ln -sfn "${GShadeHome}${avx}/GShade${ARCH}.dll" "${gapi}".dll
+  if [ $? != 0 ] || [ ! -L "${gapi}.dll" ]; then cp "${GShadeHome}${avx}/GShade${ARCH}.dll" "$gapi".dll; fi
   if [ ! -f "GShade.ini" ]; then cp "$GShadeHome/GShade.ini" "GShade.ini"; fi
   ln -sfn "$GShadeHome/gshade-shaders" "gshade-shaders"
   if [ $? != 0 ] || [ ! -L "gshade-shaders" ]; then cp -a "$GShadeHome/gshade-shaders" "gshade-shaders"; fi
