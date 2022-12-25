@@ -224,7 +224,7 @@ saveSettings() {
 
 restoreSettings() {
   [ -z "$1" ] && iniFile="$GShadeHome/GShade.ini" || iniFile="$1"
-  confFile=$(printf "$(<$iniFile)")
+  confFile=$(printf "%s" "$(<$iniFile)")
   for (( i=0; i<${#iniSettings[@]}; i+=2 ))
     do
       confFile="$(printf "%s" "$confFile" | sed "/^${iniSettings[i]}/s/=.*$/=${iniSettings[i+1]}/")"
@@ -396,7 +396,7 @@ update() {
     fi
     printf "\e[2K\rDownloading latest GShade...                     "
     curl -sLO https://github.com/Mortalitas/GShade/releases/latest/download/GShade.Latest.zip
-    unzip -qquo GShade.Latest.zip
+    unzip -qqo GShade.Latest.zip
     printf "\e[2K\rRestoring any applicable GShade.ini settings...  "
     restoreSettings
     printf "Completed!\n"
