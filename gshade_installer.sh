@@ -20,6 +20,10 @@ gapi=""
 ARCH=""
 forceUpdate=0
 
+# Sigh.
+wineLoc=""
+wineBin="wine"
+
 ##
 # Checking if running on Mac
 IS_MAC=false
@@ -96,15 +100,59 @@ readNumber() {
 # Function to output only the md5 checksum
 getMD5() {
   if [ "$IS_MAC" = true ] ; then
-    md5 -q $1
+    md5 -q "$1"
   else
-    md5sum $1 | awk '{ print $1 }'
+    md5sum "$1" | awk '{ print $1 }'
   fi
 }
 
 ##
 # Workaround for platforms that don't ship with gnu readlink
 readlinkf(){ perl -MCwd -e 'print Cwd::abs_path shift' "$1";}
+
+##
+# Y'all just lucky I don't name this 'findWineOrSomethingStronger'.
+findWine() {
+  # For, uhh, Macs.
+  if [ $IS_MAC = true ] ; then
+    if ( ! hash wine64 &>/dev/null ); then
+      if [ -d "$cxLoc/Contents/SharedSupport/CrossOver/bin" ]; then
+        wineLoc="$cxLoc/Contents/SharedSupport/CrossOver/bin"
+        wineBin="wineloader64"
+      else
+        printf "Could not find a valid CrossOver install at: %s and wine is not installed\n", "$cxLoc"
+        exit 1
+      fi
+    else
+      wineBin="wine64"
+    fi
+  fi
+  # For SteamDecks / flatpaks.
+  if [[ "$IS_MAC" = "false" ]] && ( ! hash "$wineBin" &>/dev/null ); then
+    if ( flatpak list --app 2> /dev/null | grep -i org.winehq.Wine &> /dev/null ); then
+      wineBin="flatpak run org.winehq.Wine"
+    else
+      printf "No wine found at all -- not even flatpak!  Exiting!\n"
+      exit 1
+    fi
+  fi
+}
+
+##
+# For the rare occasion this is still necessary.  At this time, this is an issue with openGL games ONLY, but the code is designed to be able to handle other APIs if the issue crops up elsewhere.
+# Invocation: makeWineOverride <gapi>
+makeWineOverride() {
+  gapi="$1"
+  export WINEPREFIX
+  if [ -n "$wineLoc" ] ; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
+  # Somewhat ham-fisted, but this is the only time we use wine.  This will kill the script if it can't find wine.
+  findWine
+  if (! yesNo "*** Changing wine versions has the potential to break your wine prefix!  Please back up your wine prefix if you're going to proceed! ***\nHave you backed up your wine prefix and are you sure you wish to continue?  "); then
+    printf "\nAborting!\n"
+    exit 1
+  fi
+  $wine reg add 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${gapi}" /d native,builtin /f > /dev/null 2>&1
+}
 
 ##
 # Backup GShade's gshade-shaders (and git shaders if they exist), as well as each games' gshade-presets/ and GShade.ini.
@@ -489,10 +537,17 @@ forgetGame() {
   gameExe="" gameLoc="" WINEPREFIX="" git=1
 }
 
+##
+# Clean soft links pointing to $GShadeHome from the current directory, AND, if the game was opengl32, remove the override.
 cleanSoftLinks(){
   if ( validPrefix ); then
     export WINEPREFIX
     oldGapi="$(basename "$(find '.' -maxdepth 1 -lname "$GShadeHome/GShade*.dll" -exec basename {} ';')" .dll)"
+    # OpenGL32 still needs wine overrides.
+    if [ "$oldGapi" == "opengl32" ]; then
+      if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
+      $wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${oldGapi}" /f > /dev/null 2>&1
+    fi
   fi
   find "$gameLoc" -maxdepth 1 -lname "$GShadeHome/*" -delete > /dev/null 2>&1
 }
@@ -538,7 +593,7 @@ installGame() {
     printf "\nInstalling to 32-bit executables is not supported on macOS.  Exiting.\n"
     exit 1
   fi
-  # Clean up an old install before the new soft links and reg edits are re-added.  Mostly to deal with changing gapi's.
+  # Clean up an old install before the new soft links and reg edits (if necessary) are re-added.  Mostly to deal with changing gapi's.
   cleanSoftLinks
   avx=""
   # Check for AVX system flags and if they're missing, sort it out.
@@ -546,6 +601,7 @@ installGame() {
     avx="/Legacy (Non-AVX)"
     printf "AVX CPU flag not detected.  Non-AVX DLLs will be linked.\n"
   fi
+  if [ "$gapi" == "opengl32" ]; then makeWineOverride "$gapi"; fi
   ln -sfn "$GShadeHome/d3dcompiler_47s/d3dcompiler_47.dll.${ARCH}bit" d3dcompiler_47.dll
   if [ $? != 0 ] || [ ! -L "d3dcompiler_47.dll" ]; then cp "$GShadeHome/d3dcompiler_47s/d3dcompiler_47.dll.${ARCH}bit" d3dcompiler_47.dll; fi
   ln -sfn "${GShadeHome}${avx}/GShade${ARCH}.dll" "${gapi}".dll
