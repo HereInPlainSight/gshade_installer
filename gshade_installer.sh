@@ -802,6 +802,7 @@ menu() {
 	2) Install to a custom game
 	P) Update presets only
 	F) Attempt auto-install for FFXIV
+	U) Force update GShade installation
 	B) Create a backup of existing GShade game installations
 	S) Show games GShade is installed to
 	L) Change GShade's language
@@ -823,6 +824,7 @@ stepByStep() {
       [1]* ) printf "\n"; update;;
       [2]* ) printf "\n"; customGamePrompt; customGame; break;;
       [Ff]* ) XIVinstall; break;;
+      [Uu]* ) printf "\n"; forceUpdate=1; update;;
       [Pp]* ) presetUpdate; printf "Done!\n"; break;;
       [Bb]* ) performBackup; printf "Done!\n"; break;;
       [Ss]* ) listGames; if [ $? ]; then printf "%b" "\n$gamesList"; else printf "\nNo games yet installed to.\n"; fi;;
