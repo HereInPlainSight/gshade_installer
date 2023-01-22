@@ -648,18 +648,18 @@ XIVinstall() {
   lutrisYaml=($(find "$XDG_CONFIG_HOME"/lutris/games/ -name 'final-fantasy-xiv*' -print 2>/dev/null))
   xlcoreini=($(find "$HOME"/.xlcore/ -name 'launcher.ini' -print 2>/dev/null))
 	
-	if [[ "$IS_MAC" = "true" ]] && [[ -d "/Applications/XIV on Mac.app" ]]; then
-		WINEPREFIX="$HOME/Library/Application Support/XIV on Mac/wineprefix"
-		gameLoc="$(defaults read dezent.XIV-on-Mac GamePath)/game/"
-		gapi=d3d11;
-		printf "\n $gameLoc"
-		printf "\nIf you have a MacBook Pro it's Fn+Shift+f2 to open the gshade window!"
-		printf "\nXIV on Mac detected.\n"
-		printf "\nInstalling...  ";
-		installGame
-		printf "Complete!\n"
-		exit 0
-	fi
+  if [[ "$IS_MAC" = "true" ]] && [[ -d "/Applications/XIV on Mac.app" ]]; then
+    WINEPREFIX="$HOME/Library/Application Support/XIV on Mac/wineprefix"
+    gameLoc="$(defaults read dezent.XIV-on-Mac GamePath)/game/"
+    gapi=d3d11;
+    printf "\n $gameLoc"
+    printf "\nIf you have a MacBook Pro it's Fn+Shift+f2 to open the gshade window!"
+    printf "\nXIV on Mac detected.\n"
+    printf "\nInstalling...  ";
+    installGame
+    printf "Complete!\n"
+    exit 0
+  fi
 
   if [ -z "$WINEPREFIX" ]; then WINEPREFIX="$HOME/.wine"; fi
   if ( validPrefix ); then
