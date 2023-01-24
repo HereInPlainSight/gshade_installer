@@ -619,6 +619,9 @@ installGame() {
     printf "%b" "Game:\t\t$gameExe$([ -n "$git" ] && printf "\t -- GIT INSTALLATION")\nInstalled to:\t$gameLoc\nWINEPREFIX:\t$WINEPREFIX\n" > "$backupDir/gameInfo.txt"
   fi
   rsync -a "$GShadeHome/$([ $git == 0 ] && printf "git/GShade-Presets/" || printf "gshade-presets")" "./$([ $git == 0 ] && printf "gshade-presets/")"
+  if [ ! -d "$gameLoc/gshade-addons" ]; then
+    mkdir -p "$gameLoc/gshade-addons"
+  fi
 ##
 # GShade Converter.exe is no longer supported by GShade, thus no longer supported in this script.
 #  ln -sfn "$GShadeHome/GShade Converter.exe" "GShade Converter.exe"
