@@ -43,7 +43,7 @@ shopt -s extglob
 ##
 #Syntax options:
 #				$0					-- Guided tutorial.
-#				$0 update [force|presets]		-- Install / Update to latest GShade.  Optionally force the full update or just presets.
+#				$0 update [force|presets]		-- Install / Update to latest GShade.  Optionally force the full update or just presets (and shaders).
 #				$0 list					-- List games, numbers provided are for use with remove / delete options.
 #				$0 lang <en|ja|ko|de|fr|it> [default|#]	-- Change the language of GShade's interface.  Defaults to the master copy if unspecified.
 #				$0 remove <#>				-- Remove <#> from database, leave GShade in whatever shape it's currently in.
@@ -61,7 +61,7 @@ shopt -s extglob
 printHelp() {
   helpText="Syntax options:
 				%s						-- Guided tutorial.
-				%s update [force|presets]			-- Install / Update to latest GShade.  Optionally force the full update or just presets.
+				%s update [force|presets]			-- Install / Update to latest GShade.  Optionally force the full update or just presets (and shaders).
 				%s list					-- List games, numbers provided are for use with remove / delete options.
 				%s lang <en|ja|ko|de|fr|it> [default|#]	-- Change the language of GShade's interface.  Defaults to the master copy if unspecified.
 				%s remove <#>				-- Remove <#> from database, leave GShade in whatever shape it's currently in.
@@ -341,17 +341,23 @@ updateInstalls() {
 }
 
 ##
-# Pull presets from repo.
-presetUpdate() {
+# Download current presets and shaders.
+presetAndShaderUpdate() {
+  GShadePresetPassword="By entering or otherwise utilizing this password I hereby acknowledge that I am using the official GShade installer, the official GShade Linux installation script, or the official XIV On Mac script. Further, I acknowledge that I must request permission from all of the creators of the presets in this file before accessing or downloading this file through any other scripts, applications, or tools."
+  GShadeShaderPassword="By entering or otherwise utilizing this password I hereby acknowledge that I am using the official GShade installer, the official GShade Linux installation script, or the official XIV On Mac script. Further, I acknowledge that I must request permission from all of the creators and copyright holders of the shaders and textures in this file before accessing or downloading this file through any other scripts, applications, or tools."
   pushd "$GShadeHome" > /dev/null || exit
   timestamp=$(date +"%Y-%m-%d/%T")
   if [ -f "version" ]; then performBackup "$timestamp"; [ -d "$GShadeHome/git" ] && gitUpdate "$timestamp"; fi
   printf "Updating presets..."
-  curl -sLO https://github.com/Mortalitas/GShade-Presets/archive/master.zip
+  curl -sLO -u "gshadepresets:$GShadePresetPassword" https://gposers.com/gshade-assets/presets/GShade-Presets.zip
+  curl -sLO -u "gshadeshaders:$GShadeShaderPassword" https://gposers.com/gshade-assets/shaders/GShade-C-Shaders.zip
+  mkdir tmpDir
   if [ "$IS_MAC" = true ] ; then
-    ditto -xk master.zip . && rm -r master.zip gshade-presets #has to be extracted with ditto because of special chars on APFS
+    ditto -xk GShade-Presets.zip . && rm -r GShade-Presets.zip gshade-presets #has to be extracted with ditto because of special chars on APFS
+    ditto -xk GShade-C-Shaders.zip tmpDir && rm -r GShade-C-Shaders.zip gshade-shaders && mv tmpDir/gshade-shaders ./ && rmdir tmpDir
   else
-    unzip -qquo master.zip && rm -r master.zip gshade-presets
+    unzip -qquo GShade-Presets.zip && rm -r GShade-Presets.zip gshade-presets
+    unzip -qquo GShade-C-Shaders.zip -d tmpDir && rm -r GShade-C-Shaders.zip gshade-shaders && mv tmpDir/gshade-shaders ./ && rmdir tmpDir
   fi
   mv "GShade-Presets-master" "gshade-presets"
   updateInstalls presets
@@ -431,12 +437,12 @@ update() {
         done < "$dbFile"
       fi
     fi
-    presetUpdate
+    presetAndShaderUpdate
     if [[ -f "$GShadeHome/GShade.ini" ]]; then
       printf "Saving GShade.ini settings..."
       saveSettings
     fi
-    rm -rf "GShade.Latest.zip" "gshade-shaders"
+    rm -rf "GShade.Latest.zip"
     if [[ -f "$GShadeHome/GShade64.dll" ]]; then
       printf "\e[2K\rmd5sums in process..."
       old64="$(getMD5 GShade64.dll)"
@@ -656,7 +662,7 @@ XIVinstall() {
     gameLoc="$(defaults read dezent.XIV-on-Mac GamePath)/game/"
     gapi=d3d11;
     printf "\n $gameLoc"
-    printf "\nIf you have a MacBook Pro it's Fn+Shift+f2 to open the gshade window!"
+    printf "\nIf you have a MacBook Pro it's Fn+Shift+Backspace to open the gshade window!"
     printf "\nXIV on Mac detected.\n"
     printf "\nInstalling...  ";
     installGame
@@ -829,7 +835,7 @@ stepByStep() {
       [2]* ) printf "\n"; customGamePrompt; customGame; break;;
       [Ff]* ) XIVinstall; break;;
       [Uu]* ) printf "\n"; forceUpdate=1; update;;
-      [Pp]* ) presetUpdate; printf "Done!\n"; break;;
+      [Pp]* ) presetAndShaderUpdate; printf "Done!\n"; break;;
       [Bb]* ) performBackup; printf "Done!\n"; break;;
       [Ss]* ) listGames; if [ $? ]; then printf "%b" "\n$gamesList"; else printf "\nNo games yet installed to.\n"; fi;;
       [Rr]* ) listGames  # Remove from list & untrack.
@@ -949,7 +955,7 @@ case $1 in
   update)
     case $2 in
       presets)
-        presetUpdate
+        presetAndShaderUpdate
         exit 0;;
       force)
         forceUpdate=1;;
