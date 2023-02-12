@@ -1,3 +1,19 @@
+# THIS SCRIPT IS BROKEN AND WILL NOT WORK
+
+If you've used this script to install GShade to games previously and you're looking to safely uninstall, please use the `delete` function of the script to remove all installations of GShade to games (ex., `./gshade_installer.sh delete 1` until there's nothing left to delete), and then delete the entire `$XDG_DATA_HOME/GShade` directory.  (Defaults to `$HOME/.local/share/GShade` if `$XDG_DATA_HOME` is not set.)
+
+This will remove *all* traces of GShade (shaders and presets as well) from your computer *and* leave your game in a working state.
+
+# If it's dead why isn't it archived?
+
+Because I might make `reshade_installer.sh` instead but I'm not the best scripter so I'm looking for feedback to issues [over here](https://github.com/HereInPlainSight/gshade_installer/issues/27).
+
+-----------------------
+Original readme archived below.
+
+-----------------------
+-----------------------
+
 # gshade_installer
 
 This is a CLI [GShade](https://gposers.com/gshade/) installer for Linux.  It both downloads and updates GShade and can be used to install / update your GShade installs for individual games that will be run through WINE.
