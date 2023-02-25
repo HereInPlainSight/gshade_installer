@@ -417,8 +417,7 @@ update() {
       printf "The following necessary command(s) could not be found: %s\n", "$mia"
       exit 1
     fi
-    mkdir -p "$ReShadeHome/dataDirs/presets/" && pushd "$ReShadeHome" > /dev/null && touch games.db && popd > /dev/null || exit
-    curl -sLO "https://raw.githubusercontent.com/HereInPlainSight/gshade_installer/reshade/Off.ini"
+    mkdir -p "$ReShadeHome/dataDirs/presets/" && pushd "$_" > /dev/null && curl -sLO "https://raw.githubusercontent.com/HereInPlainSight/gshade_installer/reshade/Off.ini" && pushd "$ReShadeHome" > /dev/null && touch games.db && popd > /dev/null || exit
     fetchCompilers
   fi
   reshadeCurrent=$(curl --silent "https://api.github.com/repos/crosire/reshade/tags" | grep -m 1 '"name":' | sed -E 's/.*"([^"]+)".*/\1/' | sed -e 's/v//g')
