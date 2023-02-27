@@ -2,14 +2,9 @@
 
 ###
 # TODO:
-# Just about everything, I guess.
-# Off the top of my head, determine what to do about:
-#   - ReShade shaders? https://www.pcgamingwiki.com/wiki/ReShade#List_of_known_shader_repositories
-#   - ReShade presets? ReShade.me points to https://sfx.thelazy.net/games/
-#     - I have no good suggestions to make this less of a point of pain.
-#   - Long-standing script decision: sunset WINEPREFIX by default, and only require it for opengl games?
-#     - If so, make sure the games.db code can handle a blank wineprefix.
-#     - Remove all the checks for a proper wineprefix (I mean, it's a pretty unintelligent check anyway) except for when modifying the wineprefix, I suppose.
+#   - THE TIME HAS COME: sunset WINEPREFIX by default, only require it for opengl games.
+#     - Make sure the games.db code can handle a blank wineprefix.  Debug / output code.
+#     - Remove all the checks for a proper wineprefix (I mean, it's a pretty unintelligent check anyway) except for when modifying the wineprefix / opengl, I suppose.
 #
 # Once upon a time, this area just said:
 # - Don't break anything.
@@ -46,14 +41,14 @@ fi
 declare -a iniSettings=()
 
 ##
-# Because slashes and I mean, bash v4 came out when, again?
-# Hi self, I don't mean to interrupt.  Didn't you get rid of why you needed this?
+# Pattern matching used to avoid deleting 'Off.ini' and 'Custom' directories.
+# Self: Does this break macs?
 shopt -s extglob
 
 ##
 #Syntax options:
 #				$0					-- Guided tutorial.
-#				$0 update [force]			-- Install / Update to latest ReShade.  Optionally force the update.
+#				$0 update [force|shaders|presets]	-- Install / Update to latest ReShade, or update shaders / presets.  Optionally force the ReShade update.
 #				$0 list					-- List games, numbers provided are for use with remove / delete options.
 #				$0 remove <#>				-- Remove <#> from database, leave ReShade in whatever shape it's currently in.
 #				$0 delete <#>				-- Delete ReShade from <#> and remove from database.
@@ -70,7 +65,7 @@ shopt -s extglob
 printHelp() {
   helpText="Syntax options:
 				%s						-- Guided tutorial.
-				%s update [force]			-- Install / Update to latest ReShade.  Optionally force the update.
+				%s update [force|shaders|presets]		-- Update to latest ReShade, shaders or presets.  Optionally forcefully update ReShade.
 				%s list					-- List games, numbers provided are for use with remove / delete options.
 				%s remove <#>				-- Remove <#> from database, leave ReShade in whatever shape it's currently in.
 				%s delete <#>				-- Delete ReShade from <#> and remove from database.
@@ -78,7 +73,7 @@ printHelp() {
  WINEPREFIX=/path/to/prefix	%s [dx(?)|opengl] /path/to/game.exe		-- Install to custom location with designated graphical API version. 'dxgi' is valid here (and the recommended default).
 
 									Note: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!\n"
-  printf "$helpText" "$0" "$0" "$0" "$0" "$0" "$0" "$0" "$0"
+  printf "$helpText" "$0" "$0" "$0" "$0" "$0" "$0" "$0"
 }
 
 ##
@@ -185,104 +180,77 @@ performBackup() {
 }
 
 fetchCompilers() {
-    if [ ! -d "$ReShadeHome/d3dcompiler_47s" ]; then
-      mkdir -p "$ReShadeHome/d3dcompiler_47s"
-    fi
-    pushd "$ReShadeHome/d3dcompiler_47s" > /dev/null || exit
-    printf "\e[2K\rDownloading 64-bit compiler...  "
-    ##
-    # Sourced from Lutris.  I don't even remember how I found this was sitting there.
-    curl -sO https://lutris.net/files/tools/dll/d3dcompiler_47.dll
-    mv d3dcompiler_47.dll d3dcompiler_47.dll.64bit
+  if [ ! -d "$ReShadeHome/d3dcompiler_47s" ]; then
+    mkdir -p "$ReShadeHome/d3dcompiler_47s"
+  fi
+  pushd "$ReShadeHome/d3dcompiler_47s" > /dev/null || exit
+  printf "\e[2K\rDownloading 64-bit compiler...  "
+  ##
+  # Sourced from Lutris.  I don't even remember how I found this was sitting there.
+  curl -sO https://lutris.net/files/tools/dll/d3dcompiler_47.dll
+  mv d3dcompiler_47.dll d3dcompiler_47.dll.64bit
+  printf "Done!"
+  # The following was originally sourced from The_Riesi @ https://www.reddit.com/r/linux_gaming/comments/b2hi3g/reshade_working_in_wine_43/, but the link is now dead.
+  # Utilizing the same method winetricks uses.
+  if [ "$IS_MAC" = true ] ; then
+    printf "\e[2K\rNot downloading 32-bit compiler since running on Mac!"
+    touch d3dcompiler_47.dll.32bit #placing stub
+  else
+    printf "\e[2K\rDownloading 32-bit compiler...  "
+  ##  curl -sO http://dege.freeweb.hu/dgVoodoo2/D3DCompiler_47.zip && unzip -q D3DCompiler_47.zip && rm D3DCompiler_47.zip
+    curl -sO https://download-installer.cdn.mozilla.net/pub/firefox/releases/62.0.3/win32/ach/Firefox%20Setup%2062.0.3.exe && if [ -d "7z" ]; then sevenZ="7z/bin/7z"; else sevenZ="7z"; fi; $sevenZ e -y "Firefox%20Setup%2062.0.3.exe" "core/d3dcompiler_47.dll" >> /dev/null && rm "Firefox%20Setup%2062.0.3.exe"
+    mv d3dcompiler_47.dll d3dcompiler_47.dll.32bit
     printf "Done!"
-    # The following was originally sourced from The_Riesi @ https://www.reddit.com/r/linux_gaming/comments/b2hi3g/reshade_working_in_wine_43/, but the link is now dead.
-    # Utilizing the same method winetricks uses.
-    if [ "$IS_MAC" = true ] ; then
-      printf "\e[2K\rNot downloading 32-bit compiler since running on Mac!"
-      touch d3dcompiler_47.dll.32bit #placing stub
-    else
-      printf "\e[2K\rDownloading 32-bit compiler...  "
-  ##    curl -sO http://dege.freeweb.hu/dgVoodoo2/D3DCompiler_47.zip && unzip -q D3DCompiler_47.zip && rm D3DCompiler_47.zip
-      curl -sO https://download-installer.cdn.mozilla.net/pub/firefox/releases/62.0.3/win32/ach/Firefox%20Setup%2062.0.3.exe && if [ -d "7z" ]; then sevenZ="7z/bin/7z"; else sevenZ="7z"; fi; $sevenZ e -y "Firefox%20Setup%2062.0.3.exe" "core/d3dcompiler_47.dll" >> /dev/null && rm "Firefox%20Setup%2062.0.3.exe"
-      mv d3dcompiler_47.dll d3dcompiler_47.dll.32bit
-      printf "Done!"
-    fi
-    popd > /dev/null || exit
-    printf "\e[2K\rd3dcompiler_47s downloaded\n"
-}
-
-##
-# This is all explicit for settings to save and mostly exists to be extendable for future situations like Language being added.
-# Can be passed an argument to specify a file or it will work the default file.
-#
-# ReShade status: Irrelevant?  Reason to keep?  In theory it's nice but is there anything pressing that needs to be saved?
-saveSettings() {
-  [ -z "$1" ] && iniFile="$ReShadeHome/ReShade.ini" || iniFile="$1"
-  iniSettings+=("Language")
-  doesItExist="$(awk -F'=' '/Language/{print $2}' "$iniFile")"
-  if [[ $doesItExist != "" ]]; then
-    iniSettings+=("$doesItExist")
-  else
-    iniSettings+=("$(updateLanguage "${LANG:0:2}")\r")
   fi
-#  for i in "PerformanceMode"
-#    do
-#      iniSettings+=("$i")
-#      iniSettings+=("$(awk -F'=' '/'"$i"'/{print $2}' "$iniFile")")
-#  done
+  popd > /dev/null || exit
+  printf "\e[2K\rd3dcompiler_47s downloaded\n"
 }
 
 ##
-# ReShade status: If above is useless, so is this, probably.
-restoreSettings() {
-  [ -z "$1" ] && iniFile="$ReShadeHome/ReShade.ini" || iniFile="$1"
-  confFile=$(printf "%s" "$(<$iniFile)")
-  for (( i=0; i<${#iniSettings[@]}; i+=2 ))
-    do
-      confFile="$(printf "%s" "$confFile" | sed "/^${iniSettings[i]}/s/=.*$/=${iniSettings[i+1]}/")"
-  done
-  printf "%s\n" "$confFile" > "$iniFile"
-}
-
-##
-# For modifying an existing .ini file.
-# Invocation: modifySettings <iniFile> <key> <value> [section]
-# Return values: 2 = $key not found in file, $section specified but not found.
-#		 1 = $key not found in file, $section not specified.
-#		 0 = success.
-# This assumes the iniFile was already confirmed to exist.  If the key is missing, this function will fail unless it's been told which [section] in the file it belongs to.  If the [section] does not exist, the function will fail.
+# Check `$ReShadeHome/include.d` and `$ReShadeHome/blacklist.d` for (presently) '*.shader' and '*.preset' files.
+# Format of files: github URLs, one per line.  #'s as the first character are comments and ignored.
+# The blacklist always wins.
 #
-# ReShade status: Unnecessary?
-modifySettings() {
-  iniFile="$1"
-  key="$2"
-  value="$3"
-  [ -z "$4" ] && section="" || section="$4"
-  if [[ "$(awk -F'=' '/'"$key"'/{print $2}' "$iniFile")" == "" ]]; then
-    if [[ $section != "" ]]; then
-      line="$(awk -F'=' '/'\\["$section"\\]'/{print NR}' "$iniFile")"
-      if [[ $line != "" ]]; then
-        sed -i "${line}a $key=$value" "$iniFile"
-      else
-        return 2
-      fi
-    else
-      return 1
-    fi
-  else
-    sed -i "/^${key}/s/=.*$/=$value/" "$iniFile"
-    return 0
+# Invocation: addIncludes "<shader|preset>" "<array to iterate>"
+addIncludes(){
+  extension="$1"
+  local -n addList="$2"
+  if [ -d "$ReShadeHome/include.d" ]; then
+    pushd "$ReShadeHome/include.d" > /dev/null
+    for i in *.$extension; do
+      [ -f "$i" ] || break
+      for j in "$i"; do
+        addList+=($(grep "^[^#]" $j))
+      done
+    done
+    popd > /dev/null
+  fi
+  if [ -d "$ReShadeHome/blacklist.d" ]; then
+    pushd "$ReShadeHome/blacklist.d" > /dev/null
+    for i in *.$extension; do
+      [ -f "$i" ] || break
+      for j in "$i"; do
+        deletions=($(grep "^[^#]" $j))
+        for k in ${deletions[@]}; do
+          addList=("${addList[@]/$k}")
+	done
+      done
+    done
+    popd > /dev/null
   fi
 }
 
 ##
-# Update installs, presets or presets and reshade requested.
+# Update installs.  Presets or presets and reshade as requested.
 # Invokation: updateInstalls <presets|all>
-updateInstalls() {
+updateInstalls(){
   updating="$1"
   performBackup
   while IFS="=;" read -r gameName installDir prefixDir; do
-    cp -rf "reshade/presets/" "$installDir/reshade/"
+    pushd "$installDir/reshade/presets/" > /dev/null || exit
+    rm -rf !("Off.ini"|"Custom")
+    popd > /dev/null || exit
+    cp -rf "dataDirs/presets/" "$installDir/reshade/"
     ##
     # Hard install upgrade begin
     if [[ $updating == "all" ]] && [[ $(find "$installDir" -maxdepth 1 -lname "$ReShadeHome/*.dll" -print) == "" ]]; then
@@ -306,50 +274,42 @@ updateInstalls() {
 
 ##
 # Expects to already be in the base git directory.
-# Invocation: gitMaint "address" "author-repoName"
+# Invocation: gitMaint "address" "author/repoName"
 gitMaint(){
   gitRepo="$1"
-  author="$2"
-  repo="$3"
-  localName="$author-$repo"
+  localName="$2"
   if [ ! -d "$localName" ]; then
     git clone "$gitRepo" "$localName" &> /dev/null
   else
     git pull "$localName" &> /dev/null
   fi
-  ##
-  # Per https://github.com/crosire/reshade-shaders/pull/219#issuecomment-716211466 , this is how the ReShade installer finds shaders.
-  shadersLoc="$(find "$localName" -type d -name "Shaders" -print)"
-  if [ $shadersLoc == "" ]; then shadersLoc="$(find "$localName" -type f -iname "*.fx" -printf %h -quit)"; fi
-  texturesLoc="$(find "$localName" -type d -name "Textures" -print)"
-
-  if [[ $shadersLoc != "" ]]; then rsync -a "$shadersLoc" "$ReShadeHome/dataDirs/shaders/$localName/"; fi
-  if [[ $texturesLoc != "" ]]; then rsync -a "$texturesLoc" "$ReShadeHome/dataDirs/textures/$localName/"; fi
 }
 
 ##
-# 
-shadersUpdate(){
-  shaderList=($(curl --silent "https://www.pcgamingwiki.com/wiki/ReShade" | awk '/List of known shader repositories/{flag=1;next}/Known Issues/{flag=0}flag' | grep -Eo "(http|https)://[a-zA-Z0-9./?=_%:-]*" | sort -u))
-  [ ! -d "$ReShadeHome/dataDirs/git/shaders" ] && mkdir -p "$ReShadeHome/dataDirs/git/shaders"
-  [ ! -d "$ReShadeHome/dataDirs/shaders" ] && mkdir "$ReShadeHome/dataDirs/shaders"
-  [ ! -d "$ReShadeHome/dataDirs/textures" ] && mkdir "$ReShadeHome/dataDirs/textures"
-  pushd "$ReShadeHome/dataDirs/git/shaders" > /dev/null || exit
-  printf "\e[2K\rUpdating shaders -- this could take some time!"
-  for i in "${!shaderList[@]}"; do
-    IFS='[/.]' read -ra addr <<< ${shaderList[$i]}
+# Invocation: runSources "array" "return array"
+# Expects to be in git directory already.
+# That might change to something more along the lines of
+#             runSources "array" "return array" "git folder" "zip folder"
+# if we add zip file support or something, but currently everything's a git repo.
+runSources(){
+  local -n sourceList="$1"
+  local -n returnList="$2"
+  for i in "${!sourceList[@]}"; do
+    IFS='[/.]' read -ra addr <<< ${sourceList[$i]}
     ##
     # addr[0]     = <protocol>:
     #     [1]     = <empty> (From killing '//')
     #     [2]...  = domain data
     if [[ "${addr[2]}.${addr[3]}" == "github.com" ]]; then
       # Remove anything beyond the repo name.
-      shaderList[$i]="${addr[0]}//github.com/${addr[4]}/${addr[5]}"
-      gitMaint "${shaderList[$i]}" "${addr[4]}" "${addr[5]}"
+      sourceList[$i]="${addr[0]}//github.com/${addr[4]}/${addr[5]}"
+      gitMaint "${sourceList[$i]}" "${addr[4]}/${addr[5]}"
+      returnList+=("${addr[4]}"/"${addr[5]}")
     elif [[ "${addr[3]}.${addr[4]}" == "github.io" ]]; then
       # Restructure 'github.io' addresses into their github repos.
-      shaderList[$i]="${addr[0]}//github.com/${addr[2]}/${addr[5]}"
-      gitMaint "${shaderList[$i]}" "${addr[2]}" "${addr[5]}"
+      sourceList[$i]="${addr[0]}//github.com/${addr[2]}/${addr[5]}"
+      gitMaint "$sourceList[$i]}" "${addr[2]}/${addr[5]}"
+      returnList+=("${addr[2]}"/"${addr[5]}")
     else
       # Print out the address structure while debugging if something failed.
       for j in "${!addr[@]}"; do
@@ -358,33 +318,77 @@ shadersUpdate(){
       printf "\n"
     fi
   done
-  popd > /dev/null || exit 
 }
 
 ##
+# Updates shader repos, sorts out shaders and textures.
+shadersUpdate(){
+  shaderSourceList=($(curl --silent "https://raw.githubusercontent.com/crosire/reshade-shaders/list/EffectPackages.ini" | grep "^RepositoryUrl=*" | awk -F= '{ print $2 }'))
+  [ ! -d "$ReShadeHome/dataDirs/git/shaders" ] && mkdir -p "$ReShadeHome/dataDirs/git/shaders"
+  [ ! -d "$ReShadeHome/dataDirs/shaders/Custom" ] && mkdir "$ReShadeHome/dataDirs/shaders/Custom"
+  [ ! -d "$ReShadeHome/dataDirs/textures" ] && mkdir "$ReShadeHome/dataDirs/textures"
+  printf "\e[2K\rUpdating shaders -- this could take some time!"
+  addIncludes "shader" shaderSourceList
+  pushd "$ReShadeHome/dataDirs/shaders/" > /dev/null || exit
+  rm -rf !("Custom")
+  popd > /dev/null || exit	
+  pushd "$ReShadeHome/dataDirs/git/shaders" > /dev/null || exit
+  shaderList=()
+  runSources shaderSourceList shaderList
+  for localName in "${shaderList[@]}"; do
+    tmp=(${localName//\// })
+    author="${tmp[0]}"
+    ##
+    # Per https://github.com/crosire/reshade-shaders/pull/219#issuecomment-716211466 , this is how the ReShade installer finds shaders.
+    shadersLoc="$(find "$localName" -depth -type d -name "Shaders" -print | sed 1q)"
+    if [ "$shadersLoc" == "" ]; then shadersLoc="$(find "$localName" -type f -iname "*.fx" -printf %h -quit)"; fi
+    texturesLoc="$(find "$localName" -type d -name "Textures" -print)"
+
+    if [[ $shadersLoc != "" ]]; then mkdir -p "$ReShadeHome/dataDirs/shaders/$author/"; rsync -ar "$shadersLoc" "$ReShadeHome/dataDirs/shaders/$localName/"; fi
+    if [[ $texturesLoc != "" ]]; then mkdir -p "$ReShadeHome/dataDirs/textures/$author/"; rsync -ar "$texturesLoc" "$ReShadeHome/dataDirs/textures/$localName/"; fi
+  done
+  popd > /dev/null || exit
+}
+ 
+##
 # Download current presets.
-# ReShade status: Incomplete -- decide how to deal with presets as there is no current universal repository.  ReShade's homepage links to a searchable database that's above my paygrade: https://sfx.thelazy.net/games/
-# Currently inaccessible.
-presetUpdate(){
+# ReShade status: Requires data in 'include.d/*.preset' file(s).
+presetsUpdate(){
   pushd "$ReShadeHome" > /dev/null || exit
   timestamp=$(date +"%Y-%m-%d/%T")
   if [ -f "version" ]; then performBackup "$timestamp"; fi
-  printf "Updating presets..."
+  printf "Updating presets...\n"
+  pushd "$ReShadeHome/dataDirs/presets/" > /dev/null || exit
+  rm -rf !("Off.ini"|"Custom")
+  popd > /dev/null || exit
+  presetSourceList=()
+  addIncludes "preset" presetSourceList
+  if [ "$presetSourceList" == "" ]; then popd > /dev/null || exit; return 0; fi
+  if [ ! -d "$ReShadeHome/dataDirs/git/presets" ]; then mkdir -p "$ReShadeHome/dataDirs/git/presets"; fi
+  pushd "$ReShadeHome/dataDirs/git/presets" > /dev/null || exit
+  presetList=()
+  runSources presetSourceList presetList
+  for localName in "${presetList[@]}"; do
+    tmp=(${localName//\// })
+    author="${tmp[0]}"
+    ##
+    # Find the first directory with .ini files?  There is no standard, here.
+    presetLoc="$(find "$localName" -type f -iname "*.ini" -printf %h -quit)"
+    if [[ $presetLoc != "" ]]; then mkdir "$ReShadeHome/dataDirs/presets/$author/"; rsync -ar "$presetLoc/" "$ReShadeHome/dataDirs/presets/$author/"; fi
+  done
+  popd > /dev/null || exit
   updateInstalls presets
   popd > /dev/null || exit
-  printf "\e[2K\r                   \r"
 }
 
 ##
 # Updater / initial installer.
 # Certain things ONLY happen during initial installation ATM.  The $ReShadeHome directory is created, games.db is created, the d3dcompiler_47.dlls (32 and 64-bit) are both downloaded and put in their own directory.
-#
-# ReShade status: requires clean up.
 update() {
-  if [ ! -d "$ReShadeHome" ]; then
+  if [ ! -f "$ReShadeHome/version" ]; then
     if (yesNo "ReShade initial install not found, would you like to create it?  "); then printf "\nCreating...  "; else printf "\nAborting installation.\n"; exit 1; fi
     if [ "$IS_MAC" = true ] ; then
-      prereqs=(awk ditto find git ln md5 sed unzip curl perl rsync)
+      prereqs=(awk find git ln md5 sed unzip curl perl rsync)
     else
       prereqs=(7z awk find git ln md5sum sed unzip curl perl rsync)
     fi
@@ -417,7 +421,7 @@ update() {
       printf "The following necessary command(s) could not be found: %s\n", "$mia"
       exit 1
     fi
-    mkdir -p "$ReShadeHome/dataDirs/presets/" && pushd "$_" > /dev/null && curl -sLO "https://raw.githubusercontent.com/HereInPlainSight/gshade_installer/reshade/Off.ini" && pushd "$ReShadeHome" > /dev/null && touch games.db && popd > /dev/null || exit
+    mkdir -p "$ReShadeHome" && pushd "$_" > /dev/null && touch games.db && mkdir "include.d" && mkdir "blacklist.d" && mkdir -p "dataDirs/presets/Custom" && curl -sLo "dataDirs/presets/Off.ini" "https://raw.githubusercontent.com/HereInPlainSight/gshade_installer/reshade/Off.ini" && popd > /dev/null || exit
     fetchCompilers
   fi
   reshadeCurrent=$(curl --silent "https://api.github.com/repos/crosire/reshade/tags" | grep -m 1 '"name":' | sed -E 's/.*"([^"]+)".*/\1/' | sed -e 's/v//g')
@@ -425,13 +429,8 @@ update() {
     printf "Up to date.\n"
   else
     pushd "$ReShadeHome" > /dev/null || exit
-    # ReShade does not ship with a .ini file.
-#    if [[ -f "$ReShadeHome/ReShade.ini" ]]; then
-#      printf "Saving ReShade.ini settings..."
-#      saveSettings
-#    fi
-    # Look at me.
-    # We're the default ReShade.ini file now.
+    # Look at me
+    # We're the default ReShade.ini file now
     if [[ ! -f "$ReShadeHome/ReShade.ini" ]]; then
       printf "\e[2K\rGrabbing a friendly ReShade.ini..."
       curl -sLO https://raw.githubusercontent.com/HereInPlainSight/gshade_installer/reshade/ReShade.ini
@@ -443,12 +442,10 @@ update() {
       old32="$(getMD5 ReShade32.dll)"
     fi
     shadersUpdate
+    presetsUpdate
     printf "\e[2K\rDownloading latest ReShade...                     "
     curl -sLO https://reshade.me/downloads/ReShade_Setup_$reshadeCurrent\_Addon.exe && mv ReShade_Setup_$reshadeCurrent\_Addon.exe ReShade.Latest.exe
     unzip -qqo ReShade.Latest.exe &> /dev/null
-#    printf "\e[2K\rRestoring any applicable ReShade.ini settings...  "
-#    restoreSettings
-#    printf "Completed!\n"
     printf "%s\n" "$reshadeCurrent" > version
     updateInstalls all
     popd > /dev/null || exit
@@ -506,8 +503,6 @@ listGames() {
 
 ##
 # Record game's location to a flat file database for backing up.  Check for EXACT duplicates, OR for git installations being flipped on or off as git.
-#
-# ReShade status: If you're gonna remove gitInstall from being relevant, this is the place to start.
 recordGame() {
   i=1
   while IFS="=;" read -r gameName installDir prefixDir; do
@@ -585,8 +580,6 @@ deleteGame() {
 # WINEPREFIX, gameLoc, gapi, and ARCH (I use Gentoo BTW) must all have been configured elsewhere in the script.
 # This is where the magic happens, or at least where the soft links happen and a few copies and the required dll overrides.
 # This will also make an individual backup for an install's ./reshade/presets folder if it happens to exist, and ignore ReShade.ini if it's already there.
-#
-# ReShade status: Confirm there's no AVX-necessary check.
 installGame() {
   # Get to the WINEPREFIX to make sure it's recorded as absolute and not relative.
   pushd "$WINEPREFIX" > /dev/null || exit; WINEPREFIX="$(pwd)/"; popd > /dev/null || exit
@@ -599,27 +592,17 @@ installGame() {
   fi
   # Clean up an old install before the new soft links and reg edits (if necessary) are re-added.  Mostly to deal with changing gapi's.
   cleanSoftLinks
-  avx=""
-  # Check for AVX system flags and if they're missing, sort it out.
-#  if ([ "$IS_MAC" = false ] && [ -z "$(cat /proc/cpuinfo | grep -m1 "^flags" | grep -i " avx ")" ]) || ([ "$IS_MAC" = true ] && [ -z "$(arch -x86_64 sysctl -a | grep machdep.cpu.features | grep AVX)" ]); then
-#    avx="/Legacy (Non-AVX)"
-#    printf "AVX CPU flag not detected.  Non-AVX DLLs will be linked.\n"
-#  fi
   if [ "$gapi" == "opengl32" ]; then makeWineOverride "$gapi"; fi
   ln -sfn "$ReShadeHome/d3dcompiler_47s/d3dcompiler_47.dll.${ARCH}bit" d3dcompiler_47.dll
   if [ $? != 0 ] || [ ! -L "d3dcompiler_47.dll" ]; then cp "$ReShadeHome/d3dcompiler_47s/d3dcompiler_47.dll.${ARCH}bit" d3dcompiler_47.dll; fi
-  ln -sfn "${ReShadeHome}${avx}/ReShade${ARCH}.dll" "${gapi}".dll
-  if [ $? != 0 ] || [ ! -L "${gapi}.dll" ]; then cp "${ReShadeHome}${avx}/ReShade${ARCH}.dll" "$gapi".dll; fi
+  ln -sfn "${ReShadeHome}/ReShade${ARCH}.dll" "${gapi}".dll
+  if [ $? != 0 ] || [ ! -L "${gapi}.dll" ]; then cp "${ReShadeHome}/ReShade${ARCH}.dll" "$gapi".dll; fi
   if [ ! -f "ReShade.ini" ]; then cp "$ReShadeHome/ReShade.ini" "ReShade.ini"; fi
   if [ ! -d "$gameLoc/reshade" ]; then mkdir "$gameLoc/reshade"; fi
   ln -sfn "$ReShadeHome/dataDirs/shaders" "reshade/shaders"
   if [ $? != 0 ] || [ ! -L "reshade/shaders" ]; then cp -a "$ReShadeHome/dataDirs/shaders" "reshade/shaders"; fi
   ln -sfn "$ReShadeHome/dataDirs/textures" "reshade/textures"
   if [ $? != 0 ] || [ ! -L "reshade/textures" ]; then cp -a "$ReShadeHome/dataDirs/textures" "reshade/textures"; fi
-  ##
-  # notification.wav does not exist in ReShade.
-  #ln -sfn "$ReShadeHome/notification.wav" "notification.wav"
-  #if [ $? != 0 ] || [ ! -L "notification.wav" ]; then cp -a "$ReShadeHome/notification.wav" "notification.wav"; fi
   if [ -d "$gameLoc/reshade/presets" ]; then
     timestamp=$(date +"%Y-%m-%d/%T")
     backupDir="$ReShadeHome/Backups/$timestamp/$gameExe/"
@@ -785,6 +768,7 @@ customGamePrompt() {
   done
 }
 
+##
 # Determines $ARCH and $gameLoc from $exeFile.
 customGame() {
   # Bank the dirname as an absolute path.
@@ -808,14 +792,16 @@ menu() {
   printf "Welcome to the ReShade CLI installer!  Please select an option:
 	1) Update ReShade
 	2) Install to a custom game
-	F) Attempt auto-install for FFXIV
-	U) Force update ReShade installation
-	B) Create a backup of existing ReShade game installations
-	S) Show games ReShade is installed to
-	R) Remove game from installed games list
-	D) Delete ReShade from game and remove from list
+	X) Attempt auto-install for FF(X)IV
+	F) (F)orce update ReShade (and shaders / presets)
+	S) Update (S)haders
+	P) Update (P)resets
+	B) Create a (b)ackup of existing ReShade game installations
+	L) (L)ist games ReShade is installed to
+	R) (R)emove game from installed games list
+	D) (D)elete ReShade from game and remove from list
 	0) Redownload compilers
-	Q) Quit
+	Q) (Q)uit
 "
 }
 
@@ -829,11 +815,12 @@ stepByStep() {
     case $yn in
       [1]* ) printf "\n"; update;;
       [2]* ) printf "\n"; customGamePrompt; customGame; break;;
-      [Ff]* ) XIVinstall; break;;
-      [Uu]* ) printf "\n"; forceUpdate=1; update;;
-      [Pp]* ) presetAndShaderUpdate; printf "Done!\n"; break;;
+      [Xx]* ) XIVinstall; break;;
+      [Ff]* ) printf "\n"; forceUpdate=1; update;;
+      [Ss]* ) shadersUpdate; printf "Done!\n"; break;;
+      [Pp]* ) presetsUpdate; printf "Done!\n"; break;;
       [Bb]* ) performBackup; printf "Done!\n"; break;;
-      [Ss]* ) listGames; if [ $? ]; then printf "%b" "\n$gamesList"; else printf "\nNo games yet installed to.\n"; fi;;
+      [Ll]* ) listGames; if [ $? ]; then printf "%b" "\n$gamesList"; else printf "\nNo games yet installed to.\n"; fi;;
       [Rr]* ) listGames  # Remove from list & untrack.
         if [ $? ]; then
           printf "%b" "\n$gamesList"
@@ -852,40 +839,6 @@ stepByStep() {
           printf "\nNo games yet installed to remove.\n"
         fi
         menu;;
-#      [Ll]* ) listGames  # Change ReShade's language in game.
-#        if [ $? ]; then
-#          printf "%b" "\n0) Default ReShade.ini (for future installations)\n$gamesList"
-#          readNumber; selection=$?
-#          if [ $selection -eq 0 ]; then
-#            gameLoc="$ReShadeHome"
-#          else
-#            getGame $selection
-#          fi
-#          if [ ! -f "$gameLoc/ReShade.ini" ]; then
-#            printf "\nNo ReShade.ini found.  Please confirm ReShade is working within this install.\n"
-#          else
-#            read -p "Please choose a language (en, ja, ko, de, fr, it): " -n 2 -r langIn
-#            lang="$(echo "$langIn" | tr '[:upper:]' '[:lower:]')"
-#            case $lang in
-#              en | ja | ko | de | fr | it) modifySettings "$gameLoc/ReShade.ini" "Language" "$(updateLanguage "$lang")" "GENERAL"
-#                printf "\nUpdated!\n"
-#                ;;
-#              *) printf "Unknown language.  Please retry.";;
-#            esac
-#          fi
-#        else
-#          printf "\nUpdating default ReShade.ini -- this will affect all future installs.\n"
-#          read -p "Please choose a language (en, ja, ko, de, fr, it): " -n 2 -r langIn
-#            lang="$(echo "$langIn" | tr '[:upper:]' '[:lower:]')"
-#            case $lang in
-#              en | ja | ko | de | fr | it) modifySettings "$ReShadeHome/ReShade.ini" "Language" "$(updateLanguage "$lang")" "GENERAL"
-#                printf "\nUpdated!\n"
-#                ;;
-#              *) printf "Unknown language.  Please retry.";;
-#            esac
-#        fi
-#      forgetGame
-#      menu;;
       [0]* ) printf "\n"; fetchCompilers; menu;;
       [Ii]* ) printf "\n"; debugInfo upload; exit 0;;
       [Qq]* ) printf "\nBye!\n"; break;;
@@ -952,6 +905,12 @@ fi
 case $1 in
   update)
     case $2 in
+      shaders)
+        shadersUpdate
+	exit 0;;
+      presets)
+        presetsUpdate
+        exit 0;;
       force)
         forceUpdate=1;;
     esac
@@ -993,19 +952,6 @@ case $1 in
     *) deleteGame "$2"; exit 0;;
   esac
   exit 0;;
-#  lang | language)
-#  lang="$(echo "$2" | tr '[:upper:]' '[:lower:]')"
-#  case $lang in
-#    en | ja | ko | de | fr | it) numberLang=$(updateLanguage "$lang");;
-#    *) printf "Unknown language, '%s'.  Please retry.\n" "$2"; exit 1;;
-#  esac
-#  case $3 in
-#    default | 0) gameLoc="$ReShadeHome";;
-#    ''|*[!0-9]*) printf "Unrecognized installation candidate: %s" "$3"; exit 1;;
-#    *) getGame "$3"
-#  esac
-#  modifySettings "$gameLoc/ReShade.ini" "Language" "$numberLang" "GENERAL"
-#  exit 0;;
   debug | status)
   debugInfo "$2"
   exit 0;;
