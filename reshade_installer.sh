@@ -2,11 +2,6 @@
 
 ###
 # TODO:
-#   - THE TIME HAS COME: sunset WINEPREFIX by default, only require it for opengl games.
-#     - Make sure the games.db code can handle a blank wineprefix.  Debug / output code.
-#     - Remove all the checks for a proper wineprefix (I mean, it's a pretty unintelligent check anyway) except for when modifying the wineprefix / opengl, I suppose.
-#
-# Once upon a time, this area just said:
 # - Don't break anything.
 
 ##
@@ -53,16 +48,16 @@ shopt -s extglob
 #				$0 remove <#>				-- Remove <#> from database, leave ReShade in whatever shape it's currently in.
 #				$0 delete <#>				-- Delete ReShade from <#> and remove from database.
 #<WINEPREFIX=/path/to/prefix>	$0 ffxiv				-- Install to FFXIV in provided Wine Prefix or autodetect if no Wine Prefix.
-# WINEPREFIX=/path/to/prefix	$0 <dx[?]|opengl> /path/to/game.exe	-- Install to custom location with designated graphical API version. 'dxgi' is valid here (and the recommended default).
+#<WINEPREFIX=/path/to/prefix>	$0 <dx[?]|opengl> /path/to/game.exe	-- Install to custom location with designated graphical API version. 'dxgi' is valid here (and the recommended default).
 #
 #									Note: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!
+#									WINEPREFIX is only required for opengl games!
 #
 # Undocumented features:
 # 				$0 fetchCompilers			-- Fetch new compilers.  If this is needed, there's a good question on 'why and how.'
 #				$0 status [upload]			-- Check the status of some important bits, optionally upload it to termbin since it's a curl-friendly site.
-#				$0 git|gitUpdate			-- Downloads / updates related git repos.  Check gitUpdate() for more info.
 ##
-printHelp() {
+printHelp(){
   helpText="Syntax options:
 				%s						-- Guided tutorial.
 				%s update [force|shaders|presets]		-- Update to latest ReShade, shaders or presets.  Optionally forcefully update ReShade.
@@ -70,15 +65,16 @@ printHelp() {
 				%s remove <#>				-- Remove <#> from database, leave ReShade in whatever shape it's currently in.
 				%s delete <#>				-- Delete ReShade from <#> and remove from database.
 <WINEPREFIX=/path/to/prefix>	%s ffxiv					-- Install to FFXIV in provided Wine Prefix or autodetect if no Wine Prefix.
- WINEPREFIX=/path/to/prefix	%s [dx(?)|opengl] /path/to/game.exe		-- Install to custom location with designated graphical API version. 'dxgi' is valid here (and the recommended default).
+<WINEPREFIX=/path/to/prefix>	%s [dx(?)|opengl] /path/to/game.exe		-- Install to custom location with designated graphical API version. 'dxgi' is valid here (and the recommended default).
 
-									Note: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!\n"
+									Note: game.exe should be the GAME'S .exe file, NOT the game's launcher, if it has one!\n
+									WINEPREFIX is only required for opengl games!\n"
   printf "$helpText" "$0" "$0" "$0" "$0" "$0" "$0" "$0"
 }
 
 ##
 # Input functions.
-yesNo() {
+yesNo(){
   while true; do
     read -p "$*" -n 1 -r yn
     case $yn in
@@ -115,7 +111,7 @@ readlinkf(){ perl -MCwd -e 'print Cwd::abs_path shift' "$1";}
 
 ##
 # Y'all just lucky I don't name this 'findWineOrSomethingStronger'.
-findWine() {
+findWine(){
   # For, uhh, Macs.
   if [ $IS_MAC = true ] ; then
     if ( ! hash wine64 &>/dev/null ); then
@@ -142,10 +138,23 @@ findWine() {
 }
 
 ##
+## Return 1 if not a valid WINEPREFIX, return 0 if it is.  Or, at least if it's close enough.
+validPrefix(){
+  if [ ! -f "$WINEPREFIX/system.reg" ]; then
+    return 1;
+  fi
+  return 0;
+}
+
+##
 # For the rare occasion this is still necessary.  At this time, this is an issue with openGL games ONLY, but the code is designed to be able to handle other APIs if the issue crops up elsewhere.
 # Invocation: makeWineOverride <gapi>
-makeWineOverride() {
+makeWineOverride(){
   gapi="$1"
+  if ( ! validPrefix ); then
+    printf "Wine override required, but no valid WINEPREFIX found!  Exiting!"
+    exit 1
+  fi
   export WINEPREFIX
   if [ -n "$wineLoc" ] ; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
   # Somewhat ham-fisted, but this is the only time we use wine.  This will kill the script if it can't find wine.
@@ -162,7 +171,7 @@ makeWineOverride() {
 # Backup directory per game is Backups/$year-$month-$day/$time/$game.exe/
 # If more than one install has the same base game name (ex, both Lutris and Wine versions of XIV installed), subsequent directories will have a random string generated to keep them separate.
 # gameInfo.txt will be created per-game directory to help sorting out original path and prefixes.  These files will contain FULL directory information, with no variable substitutions.
-performBackup() {
+performBackup(){
   [ -z "$1" ] && timestamp=$(date +"%Y-%m-%d/%T") || timestamp="$1"
   mkdir -p "$ReShadeHome/Backups/$timestamp" && pushd "$_" > /dev/null || exit
   cp -r "$ReShadeHome/dataDirs/shaders" "./"
@@ -179,7 +188,7 @@ performBackup() {
   printf "\e[2K\r                   \r"
 }
 
-fetchCompilers() {
+fetchCompilers(){
   if [ ! -d "$ReShadeHome/d3dcompiler_47s" ]; then
     mkdir -p "$ReShadeHome/d3dcompiler_47s"
   fi
@@ -209,7 +218,7 @@ fetchCompilers() {
 ##
 # Check `$ReShadeHome/include.d` and `$ReShadeHome/blacklist.d` for (presently) '*.shader' and '*.preset' files.
 # Format of files: github URLs, one per line.  #'s as the first character are comments and ignored.
-# The blacklist always wins.
+# The blacklist is processed last and therefore always wins.
 #
 # Invocation: addIncludes "<shader|preset>" "<array to iterate>"
 addIncludes(){
@@ -384,7 +393,7 @@ presetsUpdate(){
 ##
 # Updater / initial installer.
 # Certain things ONLY happen during initial installation ATM.  The $ReShadeHome directory is created, games.db is created, the d3dcompiler_47.dlls (32 and 64-bit) are both downloaded and put in their own directory.
-update() {
+update(){
   if [ ! -f "$ReShadeHome/version" ]; then
     if (yesNo "ReShade initial install not found, would you like to create it?  "); then printf "\nCreating...  "; else printf "\nAborting installation.\n"; exit 1; fi
     if [ "$IS_MAC" = true ] ; then
@@ -455,10 +464,10 @@ update() {
 
 ##
 # List games found in $dbFile ($ReShadeHome/games.db), formatted as:
-# #) Game:		<exe file>	[[ 'GIT INSTALLATION' if appropriate. ]]
+# #) Game:		<exe file>
 # 	Installed to:	<exe file's location>
-# 	WINEPREFIX:	<Location of wine's prefix installed to.>
-listGames() {
+# 	WINEPREFIX:	<Location of wine's prefix installed to, if recorded.>
+listGames(){
   gamesList=""			# Always blank the list in case user is confirming removal after checking before.
   i=1				# Yeah, iterating for removal / deletion numbering options.
   if [ ! -s "$dbFile" ]; then
@@ -477,7 +486,7 @@ listGames() {
   done < "$dbFile"
   i=1
   printf "Checking md5sums..."
-  while IFS="=;" read -r gameName installDir prefixDir gitInstall; do
+  while IFS="=;" read -r gameName installDir prefixDir; do
     pushd "$installDir" > /dev/null || exit
     gapiln=$(find '.' -maxdepth 1 -name "*.dll" -lname "$ReShadeHome/ReShade*.dll" -exec basename {} ';')
     if [ -z "$gapiln" ]; then
@@ -494,7 +503,7 @@ listGames() {
       if [ -z "$gapi" ] && [ -f "$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))" 2>&1)" ] && [ "$gmd5" == "$(getMD5 "$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))")")" ]; then gapiln="$(basename "$(find '.' -maxdepth 1 \( -name "d3d*.dll" ! -name "d3dcompiler_47.dll" \))")"; fi
     fi
     popd > /dev/null || exit
-    gamesList="$gamesList$i) Game:\t\t$([ -f "$installDir/$gameName" ] && printf "\e[32m" || printf "%b" "\e[31m")$gameName\e[0m\t\t$([ -L "$installDir/$gapiln" ] && printf "%b" "\e[32m[$gapiln -> $([ ! -f "$(readlinkf "$installDir/$gapiln")" ] && printf "%b" "\e[0m\e[31m")$(basename "$(readlinkf "$installDir/$gapiln")")\e[0m\e[32m]\e[0m" || ([ -f "$installDir/$gapiln" ] && printf "\e[33m[%s]\e[0m" "$gapiln" || printf "%b" "\e[31mReShade symlink not found!\e[0m"))\n\tInstalled to:\t$([ ! -d "$installDir" ] && printf "%b" "\e[31m")${installDir/#$HOME/"\$HOME"}\e[0m\n\tWINEPREFIX:\t$([ ! -d "$prefixDir" ] && printf "%b" "\e[31m")${prefixDir/#$HOME/"\$HOME"}\e[0m\n"
+    gamesList="$gamesList$i) Game:\t\t$([ -f "$installDir/$gameName" ] && printf "\e[32m" || printf "%b" "\e[31m")$gameName\e[0m\t\t$([ -L "$installDir/$gapiln" ] && printf "%b" "\e[32m[$gapiln -> $([ ! -f "$(readlinkf "$installDir/$gapiln")" ] && printf "%b" "\e[0m\e[31m")$(basename "$(readlinkf "$installDir/$gapiln")")\e[0m\e[32m]\e[0m" || ([ -f "$installDir/$gapiln" ] && printf "\e[33m[%s]\e[0m" "$gapiln" || printf "%b" "\e[31mReShade symlink not found!\e[0m"))\n\tInstalled to:\t$([ ! -d "$installDir" ] && printf "%b" "\e[31m")${installDir/#$HOME/"\$HOME"}\e[0m$([ -n "$prefixDir" ] && printf "%b" "\n\tWINEPREFIX:\t\e[0m${prefixDir/#$HOME/"\$HOME"}\e[0m")\n"
     ((++i))
   done < "$dbFile"
   printf "\e[2K\r"
@@ -502,12 +511,11 @@ listGames() {
 }
 
 ##
-# Record game's location to a flat file database for backing up.  Check for EXACT duplicates, OR for git installations being flipped on or off as git.
-recordGame() {
+# Record game's location to a flat file database for backing up.  Check for EXACT duplicates.
+recordGame(){
   i=1
   while IFS="=;" read -r gameName installDir prefixDir; do
-#    if [ -z "$prefixDir" ]; then ... that's okay?; fi
-    if [ "$gameName" == "$gameExe" ] && [ "$installDir" == "$gameLoc" ] && [ "$prefixDir" == "$WINEPREFIX" ] && [ "$gitInstall" == "$git" ]; then return 0; fi
+    if [ "$gameName" == "$gameExe" ] && [ "$installDir" == "$gameLoc" ] && [ "$prefixDir" == "$WINEPREFIX" ]; then return 0; fi
     ((i++))
   done < "$dbFile"
   record="$gameExe=$gameLoc;$WINEPREFIX"
@@ -518,11 +526,11 @@ recordGame() {
 ##
 # Invokation: getGame #
 # Pulls the relevant variables for a game based on line number from games.db.
-getGame() {
+getGame(){
   [ -z "$1" ] && return 1 || line="$1"
   oldIFS="$IFS"
   IFS='=;'
-  set -- "$(awk -F '=;' 'NR=='"$line"' {print $1, $2, $3, $4}' "$HOME/.local/share/ReShade/games.db")"
+  set -- "$(awk -F '=;' 'NR=='"$line"' {print $1, $2, $3}' "$HOME/.local/share/ReShade/games.db")"
   IFS="$oldIFS"
   gameExe=$1 gameLoc=$2 WINEPREFIX=$3
 }
@@ -530,18 +538,18 @@ getGame() {
 ##
 # Invokation: forgetGame
 # Just sets everything to default values that getGame sets.  More of a safety net than a necessity currently.
-forgetGame() {
+forgetGame(){
   gameExe="" gameLoc="" WINEPREFIX=""
 }
 
 ##
 # Clean soft links pointing to $ReShadeHome from the current directory, AND, if the game was opengl32, remove the override.
 cleanSoftLinks(){
-  if ( validPrefix ); then
-    export WINEPREFIX
-    oldGapi="$(basename "$(find '.' -maxdepth 1 -lname "$ReShadeHome/ReShade*.dll" -exec basename {} ';')" .dll)"
-    # OpenGL32 still needs wine overrides.
-    if [ "$oldGapi" == "opengl32" ]; then
+  oldGapi="$(basename "$(find '.' -maxdepth 1 -lname "$ReShadeHome/ReShade*.dll" -exec basename {} ';')" .dll)"
+  # OpenGL32 still needs wine overrides.
+  if [ "$oldGapi" == "opengl32" ]; then
+    if ( validPrefix ); then
+      export WINEPREFIX
       if [ -n "$wineLoc" ]; then wine="$wineLoc/$wineBin"; else wine="$wineBin"; fi
       $wine reg delete 'HKEY_CURRENT_USER\Software\Wine\DllOverrides' /v "${oldGapi}" /f > /dev/null 2>&1
     fi
@@ -552,7 +560,7 @@ cleanSoftLinks(){
 ##
 # Invocation: removeGame #
 # Removes line number # from $dbFile.
-removeGame() {
+removeGame(){
   newFile="$(awk -v line="$1" 'NR!=line' "$dbFile")"
   printf "%s\n" "$newFile" > "$dbFile"
 }
@@ -560,7 +568,7 @@ removeGame() {
 ##
 # Invocation: deleteGame #
 # Delete all traces of ReShade from # in $dbFile and its associated installation directory and WINEPREFIX.  But make a backup first.
-deleteGame() {
+deleteGame(){
   performBackup
   tempWINEPREFIX="$WINEPREFIX"
   IFS="=;" read -r gameName gameLoc WINEPREFIX <<< "$(sed "${1}q;d" "$dbFile")"
@@ -580,9 +588,11 @@ deleteGame() {
 # WINEPREFIX, gameLoc, gapi, and ARCH (I use Gentoo BTW) must all have been configured elsewhere in the script.
 # This is where the magic happens, or at least where the soft links happen and a few copies and the required dll overrides.
 # This will also make an individual backup for an install's ./reshade/presets folder if it happens to exist, and ignore ReShade.ini if it's already there.
-installGame() {
+installGame(){
   # Get to the WINEPREFIX to make sure it's recorded as absolute and not relative.
-  pushd "$WINEPREFIX" > /dev/null || exit; WINEPREFIX="$(pwd)/"; popd > /dev/null || exit
+  if [ "$WINEPREFIX" != "" ]; then
+    pushd "$WINEPREFIX" > /dev/null || exit; WINEPREFIX="$(pwd)/"; popd > /dev/null || exit
+  fi
 #  WINEPREFIX="${WINEPREFIX//+(\/)//}"		# Legacy, but interesting to remember.
   pushd "$gameLoc" > /dev/null || exit
   # 32 bit installs are not supported (and really not recommended in any case) on macOS
@@ -619,17 +629,8 @@ installGame() {
 }
 
 ##
-# Return 1 if not a valid WINEPREFIX, return 0 if it is.  Or, at least if it's close enough.
-validPrefix() {
-  if [ ! -f "$WINEPREFIX/system.reg" ]; then
-    return 1;
-  fi
-  return 0;
-}
-
-##
 # Automatic install for FFXIV.  Offers to install any that it finds in the following order: WINEPREFIX, Lutris, Steam.
-XIVinstall() {
+XIVinstall(){
   gameExe="ffxiv_dx11.exe"
   gapi=dxgi
   ARCH=64
@@ -651,24 +652,14 @@ XIVinstall() {
     exit 0
   fi
 
-  if [ -z "$WINEPREFIX" ]; then WINEPREFIX="$HOME/.wine"; fi
-  if ( validPrefix ); then
-
-    gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
-
-    if [ ! -d "$gameLoc" ]; then
-      if [ "$WINEPREFIX" != "$HOME/.wine" ]; then
-        printf "\nThe WINEPREFIX was found, but the game was not.  Exiting.\n"
-        exit 1
-      fi
-    else
-      printf "\nWine install found!\n\tAPI hook: dxgi\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
-      if (yesNo "Install? "); then
-        if ( ! yesNo "Install with dxgi?  You should ONLY say 'no' here if you're having issues with ReShade! " ); then gapi=d3d11; fi
-        printf "\nInstalling...  ";
-        installGame
-        printf "Complete!\n"
-      fi
+  gameLoc="$WINEPREFIX/drive_c/Program Files (x86)/SquareEnix/FINAL FANTASY XIV - A Realm Reborn/game/"
+  if [ -d "$gameLoc" ]; then
+    printf "\nWine install found!\n\tAPI hook: dxgi\n\tPrefix location: %s\n\tGame location: %s\n" "$WINEPREFIX" "$gameLoc"
+    if (yesNo "Install? "); then
+      if ( ! yesNo "Install with dxgi?  You should ONLY say 'no' here if you're having issues with ReShade! " ); then gapi=d3d11; fi
+      printf "\nInstalling...  ";
+      installGame
+      printf "Complete!\n"
     fi
   fi
 
@@ -740,7 +731,7 @@ XIVinstall() {
 
 ##
 # Walkthrough for custom game option selected from the general menu.  Gets input for $gapi, $WINEPREFIX, $gameExe, and $exeFile (which is really $fullPathToExeFile).
-customGamePrompt() {
+customGamePrompt(){
   if ( yesNo "Install with dxgi?  You should ONLY say 'no' here if you're having issues with ReShade! " ); then gapi=dxgi; else
     while true; do
       read -p "What graphics API is the game using? (opengl,dx9,dx10,dx11,dx12): " -r input
@@ -755,11 +746,13 @@ customGamePrompt() {
       esac
     done
   fi
-  while ! { [ -d "$WINEPREFIX" ] && ( validPrefix ); }; do
-    read -p "Where is the WINEPREFIX located?  (The directory where your drive_c folder is located): " WINEPREFIX
-    if [ ! -d "$WINEPREFIX" ]; then printf "%s: Directory does not exist.\n" "$WINEPREFIX";
-    elif ( ! validPrefix ); then printf "%s: Not a valid prefix, please confirm this is a working prefix.\n" "$WINEPREFIX"; fi
-  done
+  if [ "$gapi" == "opengl32" ]; then
+    while ! { [ -d "$WINEPREFIX" ] && ( validPrefix ); }; do
+      read -p "Where is the WINEPREFIX located?  (The directory where your drive_c folder is located): " WINEPREFIX
+      if [ ! -d "$WINEPREFIX" ]; then printf "%s: Directory does not exist.\n" "$WINEPREFIX";
+      elif ( ! validPrefix ); then printf "%s: Not a valid prefix, please confirm this is a working prefix.\n" "$WINEPREFIX"; fi
+    done
+  fi
   while [ ! -f "$exeFile" ] || [ "${gameExe##*.}" != "exe" ]; do
     read -p "Where is the game's .exe file?  (Note: NOT the launcher for the game!): " exeFile
     gameExe="$(basename "$exeFile")" 2>&1 > /dev/null
@@ -770,7 +763,7 @@ customGamePrompt() {
 
 ##
 # Determines $ARCH and $gameLoc from $exeFile.
-customGame() {
+customGame(){
   # Bank the dirname as an absolute path.
   pushd "$(dirname "$exeFile")" > /dev/null || exit; gameLoc="$(pwd)/"; popd > /dev/null || exit
   # Determine architecture.
@@ -788,7 +781,7 @@ customGame() {
 
 ##
 # Sometimes the menu should get repeated, sometimes not.  Easiest to call a function for it.
-menu() {
+menu(){
   printf "Welcome to the ReShade CLI installer!  Please select an option:
 	1) Update ReShade
 	2) Install to a custom game
@@ -807,7 +800,7 @@ menu() {
 
 ##
 # Guided setup with menus.
-stepByStep() {
+stepByStep(){
   [[ ! -d "$ReShadeHome" ]] && update
   menu
   while true; do
@@ -967,8 +960,6 @@ esac
 # Below is code for configuring a manual install from the command line that started with setting $gapi, and the only option that doesn't have an exit code associated with a non-error outcome.
 exeFile=$2
 
-if [ -z "$WINEPREFIX" ]; then printf "Missing required WINEPREFIX, exiting.\n"; exit 1; fi
-if ( ! validPrefix ); then printf "Not a valid WINEPREFIX, exiting.\n"; exit 1; fi
 if [ -z "$exeFile" ]; then printf "No .exe file found, exiting.\n"; exit 1; fi
 if [ ! -f "$exeFile" ]; then printf "%s: Invalid file.\n" "$exeFile"; exit 1; fi
 gameExe="$(basename "$exeFile")"
