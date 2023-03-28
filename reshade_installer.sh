@@ -110,6 +110,35 @@ getMD5(){
 readlinkf(){ perl -MCwd -e 'print Cwd::abs_path shift' "$1";}
 
 ##
+# Turn a list of new-line separated strings into an array.
+makeArray(){
+  local -n sourceList="$1"
+  oldIFS=$IFS
+  IFS=$'\n'
+  sourceList=($sourceList)
+  IFS=$oldIFS
+}
+
+##
+# Does this really not exist?  Well, it does now, I guess.  Give it an array.
+commonDir(){
+  local -n sourceList="$1"
+  leastCommonDir=${sourceList[0]}
+  for i in ${!sourceList[@]}; do
+    if [[ "${sourceList[$i]}" != "$leastCommonDir"* ]]; then
+      count=${leastCommonDir//[^,'/']}
+      for (( j=0; j<${#count}; j++ )); do
+        leastCommonDir="$(echo "$leastCommonDir" | cut -f1-$((${#count}-$j)) -d/)"
+        if [[ "${sourceList[$i]}*" == "$leastCommonDir"* ]]; then
+          break;
+        fi
+      done
+    fi
+  done
+  sourceList="$leastCommonDir"
+}
+
+##
 # Y'all just lucky I don't name this 'findWineOrSomethingStronger'.
 findWine(){
   # For, uhh, Macs.
@@ -138,7 +167,7 @@ findWine(){
 }
 
 ##
-## Return 1 if not a valid WINEPREFIX, return 0 if it is.  Or, at least if it's close enough.
+# Return 1 if not a valid WINEPREFIX, return 0 if it is.  Or, at least if it's close enough.
 validPrefix(){
   if [ ! -f "$WINEPREFIX/system.reg" ]; then
     return 1;
@@ -229,7 +258,7 @@ addIncludes(){
     for i in *.$extension; do
       [ -f "$i" ] || break
       for j in "$i"; do
-        addList+=($(grep "^[^#]" $j))
+        addList+=($(awk '/^[^$|^#]/' "$j"))
       done
     done
     popd > /dev/null
@@ -239,7 +268,7 @@ addIncludes(){
     for i in *.$extension; do
       [ -f "$i" ] || break
       for j in "$i"; do
-        deletions=($(grep "^[^#]" $j))
+        deletions=($(awk '/^[^$|^#]/' "$j"))
         for k in ${deletions[@]}; do
           addList=("${addList[@]/$k}")
 	done
@@ -295,36 +324,59 @@ gitMaint(){
 }
 
 ##
+# Remove folders that don't have a '.git' somewhere after their base directory to allow for archives to not keep crashing into themselves or making a bunch of duplicates.
+cleanSources(){
+  if [[ "$(pwd)" != "$ReShadeHome"* ]]; then
+    echo "Attempted a potentially dangerous command while not in the \$ReShadeHome directory.  You should report this."
+    exit 1
+  fi
+  find "$(pwd)" -mindepth 1 -maxdepth 1 -type d $(printf "! -name %s " $(find . -type d -name '.git' -print | cut -c 3- | cut -f1 -d"/" | uniq)) -exec rm -r {} \;
+}
+
+##
 # Invocation: runSources "array" "return array"
 # Expects to be in git directory already.
-# That might change to something more along the lines of
-#             runSources "array" "return array" "git folder" "zip folder"
-# if we add zip file support or something, but currently everything's a git repo.
 runSources(){
   local -n sourceList="$1"
   local -n returnList="$2"
   for i in "${!sourceList[@]}"; do
-    IFS='[/.]' read -ra addr <<< ${sourceList[$i]}
-    ##
-    # addr[0]     = <protocol>:
-    #     [1]     = <empty> (From killing '//')
-    #     [2]...  = domain data
-    if [[ "${addr[2]}.${addr[3]}" == "github.com" ]]; then
-      # Remove anything beyond the repo name.
-      sourceList[$i]="${addr[0]}//github.com/${addr[4]}/${addr[5]}"
-      gitMaint "${sourceList[$i]}" "${addr[4]}/${addr[5]}"
-      returnList+=("${addr[4]}"/"${addr[5]}")
-    elif [[ "${addr[3]}.${addr[4]}" == "github.io" ]]; then
-      # Restructure 'github.io' addresses into their github repos.
-      sourceList[$i]="${addr[0]}//github.com/${addr[2]}/${addr[5]}"
-      gitMaint "$sourceList[$i]}" "${addr[2]}/${addr[5]}"
-      returnList+=("${addr[2]}"/"${addr[5]}")
+    if [[ "${sourceList[i]: -4}" == ".zip" ]]; then
+      filename="${sourceList[$i]##*/}"
+      directoryName="${filename%.*}"
+      counter=1
+      if [ -d "$directoryName" ]; then
+        while [ -d "$directoryName-$counter" ]; do
+	  ((counter++))
+	done
+	directoryName="$directoryName-$counter"
+      fi
+      curl -sLo "$filename" ${sourceList[i]}
+      unzip -qquo "$filename" -d "$directoryName"
+      rm "$filename"
+      returnList+=("$directoryName")
     else
-      # Print out the address structure while debugging if something failed.
-      for j in "${!addr[@]}"; do
-        printf "$j:\t${addr[$j]}\n"
-      done
-      printf "\n"
+      IFS='[/.]' read -ra addr <<< ${sourceList[$i]}
+      ##
+      # addr[0]     = <protocol>:
+      #     [1]     = <empty> (From killing '//')
+      #     [2]...  = domain data
+      if [[ "${addr[2]}.${addr[3]}" == "github.com" ]]; then
+        # Remove anything beyond the repo name.
+        sourceList[$i]="${addr[0]}//github.com/${addr[4]}/${addr[5]}"
+        gitMaint "${sourceList[$i]}" "${addr[4]}/${addr[5]}"
+        returnList+=("${addr[4]}"/"${addr[5]}")
+      elif [[ "${addr[3]}.${addr[4]}" == "github.io" ]]; then
+        # Restructure 'github.io' addresses into their github repos.
+        sourceList[$i]="${addr[0]}//github.com/${addr[2]}/${addr[5]}"
+        gitMaint "$sourceList[$i]}" "${addr[2]}/${addr[5]}"
+        returnList+=("${addr[2]}"/"${addr[5]}")
+      else
+        # Print out the address structure while debugging if something failed.
+        for j in "${!addr[@]}"; do
+          printf "$j:\t${addr[$j]}\n"
+        done
+        printf "\n"
+      fi
     fi
   done
 }
@@ -334,14 +386,18 @@ runSources(){
 shadersUpdate(){
   shaderSourceList=($(curl --silent "https://raw.githubusercontent.com/crosire/reshade-shaders/list/EffectPackages.ini" | grep "^RepositoryUrl=*" | awk -F= '{ print $2 }'))
   [ ! -d "$ReShadeHome/dataDirs/git/shaders" ] && mkdir -p "$ReShadeHome/dataDirs/git/shaders"
-  [ ! -d "$ReShadeHome/dataDirs/shaders/Custom" ] && mkdir "$ReShadeHome/dataDirs/shaders/Custom"
-  [ ! -d "$ReShadeHome/dataDirs/textures" ] && mkdir "$ReShadeHome/dataDirs/textures"
+  [ ! -d "$ReShadeHome/dataDirs/shaders/Custom" ] && mkdir -p "$ReShadeHome/dataDirs/shaders/Custom"
+  [ ! -d "$ReShadeHome/dataDirs/textures/Custom" ] && mkdir -p "$ReShadeHome/dataDirs/textures/Custom"
   printf "\e[2K\rUpdating shaders -- this could take some time!"
-  addIncludes "shader" shaderSourceList
   pushd "$ReShadeHome/dataDirs/shaders/" > /dev/null || exit
   rm -rf !("Custom")
-  popd > /dev/null || exit	
+  popd > /dev/null || exit
+  pushd "$ReShadeHome/dataDirs/textures/" > /dev/null || exit
+  rm -rf !("Custom")
+  popd > /dev/null || exit 
   pushd "$ReShadeHome/dataDirs/git/shaders" > /dev/null || exit
+  cleanSources
+  addIncludes "shader" shaderSourceList
   shaderList=()
   runSources shaderSourceList shaderList
   for localName in "${shaderList[@]}"; do
@@ -371,18 +427,20 @@ presetsUpdate(){
   rm -rf !("Off.ini"|"Custom")
   popd > /dev/null || exit
   presetSourceList=()
-  addIncludes "preset" presetSourceList
-  if [ "$presetSourceList" == "" ]; then popd > /dev/null || exit; return 0; fi
   if [ ! -d "$ReShadeHome/dataDirs/git/presets" ]; then mkdir -p "$ReShadeHome/dataDirs/git/presets"; fi
   pushd "$ReShadeHome/dataDirs/git/presets" > /dev/null || exit
+  cleanSources
+  addIncludes "preset" presetSourceList
   presetList=()
   runSources presetSourceList presetList
   for localName in "${presetList[@]}"; do
     tmp=(${localName//\// })
     author="${tmp[0]}"
     ##
-    # Find the first directory with .ini files?  There is no standard, here.
-    presetLoc="$(find "$localName" -type f -iname "*.ini" -printf %h -quit)"
+    # There is no standard for how presets should be packaged.  So we find all ini files and rsync the common directory they all share.
+    presetLoc="$(find "$localName" -type f -iname "*.ini" -printf "%h\n" | awk '!dups[$0]++')"
+    makeArray presetLoc
+    commonDir presetLoc
     if [[ $presetLoc != "" ]]; then mkdir "$ReShadeHome/dataDirs/presets/$author/"; rsync -ar "$presetLoc/" "$ReShadeHome/dataDirs/presets/$author/"; fi
   done
   popd > /dev/null || exit
